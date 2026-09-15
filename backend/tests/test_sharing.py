@@ -100,8 +100,8 @@ def test_qr_overlay_appears_in_public_playlist(client, auth_headers):
     assert qr["position"] == "bottom-right"
     # The QR opens the screen's whole catalog, so it stays identical while the playlist
     # rotates instead of pointing to whichever item happens to be on air.
-    assert qr["image_url"] == "/api/v1/public/screens/principal/library/qr.png"
-    assert qr["share_url"].endswith("/catalog/principal")
+    assert qr["image_url"].startswith("/api/v1/public/screens/principal/library/qr.png?v=")
+    assert qr["share_url"] == "http://testserver/catalog/principal"
 
 
 def test_screen_library_lists_playlist_items_including_qr_only(client, auth_headers):

@@ -395,6 +395,7 @@ export default function SettingsPage() {
 
       {tab === "system" && status && (
         <>
+          {status.public_base_url_is_loopback && <p className="settings-notice">{t("settings.loopbackWarning")}</p>}
           <section className="metric-grid">
             <article className="metric-card accent-blue">
               <div className="metric-icon"><Server /></div>
@@ -418,7 +419,15 @@ export default function SettingsPage() {
             </article>
             <article className="metric-card accent-red">
               <div className="metric-icon"><Globe /></div>
-              <div><span>{t("settings.allowedNetwork")}</span><strong className="metric-text">{status.allowed_networks ?? t("settings.noRestriction")}</strong><p>ALLOWED_NETWORKS</p></div>
+              <div>
+                <span>{t("settings.publicAddress")}</span>
+                <strong className="metric-text">{status.public_base_url}</strong>
+                <p>
+                  {t(status.public_base_url_mode === "auto" ? "settings.addressAuto" : "settings.addressFixed")}
+                  {" · "}
+                  {t("settings.adminNetworks", { networks: status.allowed_networks ?? t("settings.noRestriction") })}
+                </p>
+              </div>
             </article>
           </section>
           <section className="panel settings-counts">

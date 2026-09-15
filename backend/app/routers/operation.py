@@ -2,7 +2,7 @@ import logging
 import time
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from redis import Redis
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ from app import __version__
 from app.config import get_settings
 from app.database import get_db
 from app.models import AuditLog, Content, Playlist, Screen, User
+from app.network import configured_base_url, is_loopback_url, public_base_url
 from app.security import require_admin, require_operator
 from app.storage import get_storage
 
@@ -46,8 +47,11 @@ def list_audit_logs(
 
 
 @router.get("/system/status")
-def system_status(db: Annotated[Session, Depends(get_db)], _operator: Annotated[User, Depends(require_operator)]) -> dict:
+def system_status(
+    request: Request, db: Annotated[Session, Depends(get_db)], _operator: Annotated[User, Depends(require_operator)]
+) -> dict:
     settings = get_settings()
+    base_url = public_base_url(request)
     storage = get_storage()
     try:
         storage_bytes: int | None = storage.usage_bytes()
@@ -70,7 +74,10 @@ def system_status(db: Annotated[Session, Depends(get_db)], _operator: Annotated[
         "version": __version__,
         "timezone": settings.timezone,
         "default_language": settings.default_language,
-        "public_base_url": settings.public_base_url,
+        # In automatic mode this is the address the administrator used to open the page.
+        "public_base_url": base_url,
+        "public_base_url_mode": "fixed" if configured_base_url() else "auto",
+        "public_base_url_is_loopback": is_loopback_url(base_url),
         "allowed_networks": settings.allowed_networks or None,
         "storage": storage.describe(),
         "storage_bytes": storage_bytes,

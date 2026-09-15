@@ -115,22 +115,46 @@ docker compose run --rm --no-deps -v "$(pwd)/backend/tests:/app/tests:ro" backen
 
 Pruebas de navegador de extremo a extremo: ver [e2e/README.md](../../e2e/README.md).
 
-## Cambiar la dirección o el puerto del servidor
+## Cuando cambia la red
+
+Con `PUBLIC_BASE_URL` vacío (el valor por defecto), los QR y enlaces compartidos se construyen con la
+dirección con que cada equipo abrió la cartelera, incluido el puerto. Si el servidor recibe otra IP o
+se cambia a otra red, **no hay que modificar `.env`**: una TV abierta en
+`http://10.0.0.8/screen/principal` muestra un QR hacia `http://10.0.0.8/catalog/principal`.
+**Configuración → Sistema** muestra la dirección en uso.
+
+Las TV igual necesitan una dirección para abrir la cartelera. De más a menos estable:
+
+1. **Un nombre en vez de una IP.** Crea un registro DNS en el router o en tu DNS local (por ejemplo
+   `cartelera.lan`), o usa mDNS: en un servidor Linux ejecuta `sudo apt install avahi-daemon` y abre
+   `http://<nombre-del-servidor>.local`. mDNS funciona en Windows 10+, macOS, iOS, la mayoría de los
+   Linux de escritorio y Android reciente; algunas smart TV y Android antiguos no resuelven `.local`.
+2. **Una reserva DHCP** en el router, para que el servidor reciba siempre la misma IP.
+3. Si no, actualiza la URL de kiosco en cada TV cuando cambie la dirección.
+
+Para restringir la administración sin atarla a una subred, usa `ALLOWED_NETWORKS=private`.
+
+Define `PUBLIC_BASE_URL` con un valor fijo sólo cuando los enlaces deban usar siempre una dirección,
+por ejemplo si las TV abren la cartelera con `localhost` en el mismo servidor, o detrás de un proxy
+inverso que no reenvía el nombre original.
+
+### Cambiar el puerto
 
 ```env
 HTTP_PORT=8080
-PUBLIC_BASE_URL=http://192.168.1.50:8080
 ```
 
-Luego `docker compose up -d` y actualiza las URL de kiosco en las TV. Los QR usan la nueva dirección
-automáticamente.
+Luego `docker compose up -d`. La cartelera queda en `http://SERVIDOR:8080` y los QR incluyen el
+puerto automáticamente. Actualiza las URL de kiosco en las TV.
 
 ## HTTPS
 
 La plataforma sirve HTTP dentro de la red local. Para exponerla hacia afuera, ponla detrás de un
-proxy inverso con certificado (Caddy, Traefik, nginx Proxy Manager, Cloudflare Tunnel...), define
-`PUBLIC_BASE_URL=https://cartelera.ejemplo.cl` y considera `ALLOWED_NETWORKS` para mantener la
-administración limitada a tu red interna.
+proxy inverso con certificado (Caddy, Traefik, nginx Proxy Manager, Cloudflare Tunnel...). Los
+enlaces pasan a `https://` automáticamente si el proxy reenvía los encabezados `Host` y
+`X-Forwarded-Proto` (la mayoría lo hace por defecto); si no, define
+`PUBLIC_BASE_URL=https://cartelera.ejemplo.cl`. Considera `ALLOWED_NETWORKS=private` para mantener la
+administración limitada a tus redes internas.
 
 ## Solución de problemas
 
@@ -143,8 +167,8 @@ administración limitada a tu red interna.
 | Errores de S3 en los logs | Revisa bucket, región, endpoint, permisos de la clave y `S3_FORCE_PATH_STYLE`. **Configuración → Sistema** muestra el bucket configurado. |
 | Las subidas fallan con "413" | Aumenta `NGINX_MAX_BODY_SIZE` y el `MAX_*_SIZE_MB` correspondiente. |
 | Un documento queda "Procesando" | `docker compose logs worker`; el worker debe estar saludable. Las presentaciones muy grandes pueden tardar unos minutos. |
-| Una pantalla aparece desconectada | Mantén la URL abierta en la TV y verifica que alcance `PUBLIC_BASE_URL`. |
+| Una pantalla aparece desconectada | Mantén la URL abierta en la TV y verifica que todavía alcance el servidor (ver [cuando cambia la red](#cuando-cambia-la-red)). |
 | No acepta el inicio de sesión | Los valores `INITIAL_ADMIN_*` sólo aplican al primer arranque. Usa `python -m app.cli reset-password`. Demasiados intentos bloquean esa IP durante `LOGIN_WINDOW_SECONDS`. |
-| Los QR no abren en los teléfonos | `PUBLIC_BASE_URL` debe ser una dirección que los teléfonos alcancen (no `localhost`) y el teléfono debe estar en una red que llegue al servidor. |
+| Los QR no abren en los teléfonos | Los QR usan la dirección con que se abrió la TV: abre la pantalla con la dirección o el nombre del servidor en la red, no `localhost` (o define un `PUBLIC_BASE_URL` fijo). El teléfono debe estar en una red que llegue al servidor. **Configuración → Sistema** avisa cuando la dirección es `localhost`. |
 | Hora incorrecta en TV o programación | Define la zona horaria en **Configuración → Marca** (y `TZ` en `.env` para los contenedores). |
 | No encuentra la dirección de una emergencia | Revisa `GEOCODING_ENABLED`, el acceso a Internet del servidor (o tu propio `GEOCODE_URL`) y `GEOCODE_COUNTRY_CODES`. |

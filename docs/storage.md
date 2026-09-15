@@ -141,7 +141,7 @@ Provider examples for `S3_ENDPOINT_URL`:
   completely private. Video seeking (HTTP Range) is supported.
 - `redirect`: the server answers with a signed link valid for `S3_PRESIGN_SECONDS` and the browser
   downloads directly from the bucket. Less load on the server, but every TV and phone needs access
-  to the bucket's endpoint, and the bucket may need CORS rules allowing `GET` from `PUBLIC_BASE_URL`.
+  to the bucket's endpoint, and the bucket may need CORS rules allowing `GET` from the board's address.
 
 The video and document worker downloads originals to a temporary folder, converts them and uploads
 the results, so conversions work the same with S3.

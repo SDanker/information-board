@@ -32,7 +32,7 @@ páginas, almacenamiento (disco local, NAS o nube compatible con S3) y el primer
 | **Configuración → Marca** (en la aplicación) | Nombre de la aplicación y de la organización, logo (también ícono del navegador), color principal, idioma por defecto, formato de fecha, zona horaria, titular y mensaje del inicio de sesión, biblioteca pública sí/no |
 | **Configuración → Nombres de páginas** | El nombre de cada página del menú (Panel, Pantallas, Publicaciones, Playlists, Biblioteca, Programación, Usuarios, Auditoría, Configuración) |
 | **Configuración → Pantallas y TV** | Segundos por defecto por elemento, segundos mínimos por página/diapositiva, segundos por foto o mapa de emergencia, filas por página en planillas, reloj sí/no y 12/24 h, mapa de emergencia sí/no, texto del pie en la TV, código QR sí/no, posición y mensaje |
-| **`.env`** (en el servidor) | Usuario y contraseña del primer administrador, pantallas iniciales, dirección pública y puerto, almacenamiento (carpeta local, NAS por SMB o NFS, nube compatible con S3), límites de tamaño de subida, duración de la sesión, límite de intentos de inicio de sesión, redes permitidas, proveedor y países de geocodificación, id de usuario de los contenedores |
+| **`.env`** (en el servidor) | Usuario y contraseña del primer administrador, pantallas iniciales, dirección pública (automática por defecto, así una IP o red nueva no requiere cambios) y puerto, almacenamiento (carpeta local, NAS por SMB o NFS, nube compatible con S3), límites de tamaño de subida, duración de la sesión, límite de intentos de inicio de sesión, redes permitidas, proveedor y países de geocodificación, id de usuario de los contenedores |
 
 Además, cada visitante puede cambiar entre inglés y español con el selector de idioma.
 

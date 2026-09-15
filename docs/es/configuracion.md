@@ -77,9 +77,9 @@ Usa **Restaurar valores** para volver a `.env`.
 
 | Variable | Por defecto | Descripción |
 | --- | --- | --- |
-| `PUBLIC_BASE_URL` | `http://localhost` | Dirección con la que teléfonos y TV llegan al servidor. Los QR y enlaces compartidos apuntan aquí: nunca uses `localhost` en una instalación real. Incluye el puerto si no es 80. |
+| `PUBLIC_BASE_URL` | vacío (automática) | Dirección que usan los QR y los enlaces compartidos. **Vacío = automática**: los enlaces usan la dirección con que cada TV, teléfono o computador abrió la cartelera (incluido el puerto), así que una IP o red nueva no requiere cambios. Define un valor fijo sólo para forzar una dirección, p. ej. `https://cartelera.ejemplo.cl` detrás de un proxy inverso. Ver [cuando cambia la red](operacion.md#cuando-cambia-la-red). |
 | `HTTP_PORT` | `80` | Puerto que nginx publica en el servidor. |
-| `ALLOWED_NETWORKS` | vacío | Subredes separadas por coma que pueden usar la API de administración, p. ej. `192.168.1.0/24,10.0.0.0/8`. Las pantallas (`/api/v1/public/*`), el estado y los WebSockets siempre son accesibles. Vacío = sin restricción. |
+| `ALLOWED_NETWORKS` | vacío | Redes que pueden usar la API de administración, separadas por coma. `private` permite todas las redes privadas (10.x, 172.16-31.x, 192.168.x, IPv6 privadas, localhost) y sigue funcionando si cambia la LAN; también sirven subredes específicas como `192.168.1.0/24`. Las pantallas (`/api/v1/public/*`), el estado y los WebSockets siempre son accesibles. Vacío = sin restricción. |
 | `CORS_EXTRA_ORIGINS` | vacío | Orígenes adicionales de navegador que pueden llamar a la API, para integraciones propias. |
 
 ### Primer administrador y pantallas

@@ -39,7 +39,7 @@ TEXT = {
         "language": "Default language (en/es)",
         "timezone": "Time zone (IANA name, e.g. America/Santiago)",
         "network": "Network",
-        "base_url": "Address used to open the board from other devices",
+        "base_url": "Fixed public address for QR codes (Enter = automatic, recommended if the server's IP or network can change)",
         "port": "HTTP port",
         "admin": "First administrator",
         "admin_user": "Username",
@@ -83,6 +83,8 @@ TEXT = {
         "invalid_comma": "Commas are not allowed here (Docker mount options are comma-separated).",
         "mismatch": "The passwords do not match.",
         "localhost_warning": "Warning: other devices cannot reach localhost; QR codes will not work from phones.",
+        "auto_address": "Automatic address: QR codes and links will use the address each device opens, e.g. {url}",
+        "restrict_admin": "Allow administration only from private networks (office or home LANs, VPNs)?",
         "written": ".env created with owner-only permissions: {path}",
         "backup_kept": "Previous .env kept as {path}",
         "generated_password": "Generated administrator password (shown only once, store it safely): {password}",
@@ -99,7 +101,7 @@ TEXT = {
         "language": "Idioma por defecto (en/es)",
         "timezone": "Zona horaria (nombre IANA, p. ej. America/Santiago)",
         "network": "Red",
-        "base_url": "Dirección para abrir la cartelera desde otros equipos",
+        "base_url": "Dirección pública fija para los QR (Enter = automática, recomendado si la IP o la red del servidor puede cambiar)",
         "port": "Puerto HTTP",
         "admin": "Primer administrador",
         "admin_user": "Usuario",
@@ -143,6 +145,8 @@ TEXT = {
         "invalid_comma": "No se permiten comas aquí (Docker separa las opciones de montaje con comas).",
         "mismatch": "Las contraseñas no coinciden.",
         "localhost_warning": "Aviso: otros equipos no pueden alcanzar localhost; los códigos QR no funcionarán desde teléfonos.",
+        "auto_address": "Dirección automática: los QR y enlaces usarán la dirección con que cada equipo abra la cartelera, p. ej. {url}",
+        "restrict_admin": "¿Permitir la administración sólo desde redes privadas (LAN de oficina o casa, VPN)?",
         "written": ".env creado con permisos sólo para el dueño: {path}",
         "backup_kept": "El .env anterior se guardó como {path}",
         "generated_password": "Contraseña de administrador generada (se muestra sólo una vez, guárdala en un lugar seguro): {password}",
@@ -189,6 +193,11 @@ def detect_ip() -> str:
     return "192.168.1.50"
 
 
+def local_url(port: str) -> str:
+    """Example address of this machine, shown when the public address is automatic."""
+    return f"http://{detect_ip()}" + ("" if port == "80" else f":{port}")
+
+
 def detect_timezone() -> str:
     if os.environ.get("TZ"):
         return os.environ["TZ"]
@@ -219,7 +228,7 @@ def base_values() -> dict[str, str]:
         "DEFAULT_LANGUAGE": "en",
         "DATE_LOCALE": "",
         "TZ": "UTC",
-        "PUBLIC_BASE_URL": f"http://{detect_ip()}",
+        "PUBLIC_BASE_URL": "",
         "HTTP_PORT": "80",
         "ALLOWED_NETWORKS": "",
         "CORS_EXTRA_ORIGINS": "",
@@ -396,10 +405,13 @@ def interactive(values: dict[str, str]) -> tuple[dict[str, str], str | None, lis
 
     ask.heading("network")
     values["HTTP_PORT"] = ask.ask("port", values["HTTP_PORT"], check_port)
-    suggested_url = values["PUBLIC_BASE_URL"] + ("" if values["HTTP_PORT"] == "80" else f":{values['HTTP_PORT']}")
-    values["PUBLIC_BASE_URL"] = ask.ask("base_url", suggested_url, check_url).rstrip("/")
-    if "localhost" in values["PUBLIC_BASE_URL"] or "127.0.0.1" in values["PUBLIC_BASE_URL"]:
+    values["PUBLIC_BASE_URL"] = ask.ask("base_url", "", lambda v: None if not v else check_url(v)).rstrip("/")
+    if not values["PUBLIC_BASE_URL"]:
+        print(f"  {text['auto_address'].format(url=local_url(values['HTTP_PORT']))}")
+    elif "localhost" in values["PUBLIC_BASE_URL"] or "127.0.0.1" in values["PUBLIC_BASE_URL"]:
         print(f"  ! {text['localhost_warning']}")
+    if ask.ask_yes_no("restrict_admin"):
+        values["ALLOWED_NETWORKS"] = "private"
 
     ask.heading("admin")
     values["INITIAL_ADMIN_USERNAME"] = ask.ask("admin_user", "admin", check_username)
@@ -457,7 +469,8 @@ def main() -> int:
     parser.add_argument("--force", action="store_true", help="replace an existing .env (a copy is kept)")
     parser.add_argument("--non-interactive", action="store_true", help="use defaults and the options below without asking")
     parser.add_argument("--language", choices=("en", "es"), default="en")
-    parser.add_argument("--base-url", help="address used to reach the server, e.g. http://192.168.1.50")
+    parser.add_argument("--base-url", help="fixed address for QR codes and links, e.g. https://board.example.org (omit for automatic)")
+    parser.add_argument("--private-admin", action="store_true", help="allow administration only from private networks")
     parser.add_argument("--port", default="80")
     parser.add_argument("--app-name")
     parser.add_argument("--organization")
@@ -490,7 +503,8 @@ def main() -> int:
             {
                 "DEFAULT_LANGUAGE": args.language,
                 "HTTP_PORT": args.port,
-                "PUBLIC_BASE_URL": (args.base_url or values["PUBLIC_BASE_URL"] + ("" if args.port == "80" else f":{args.port}")).rstrip("/"),
+                "PUBLIC_BASE_URL": (args.base_url or "").rstrip("/"),
+                "ALLOWED_NETWORKS": "private" if args.private_admin else "",
                 "APP_NAME": args.app_name or values["APP_NAME"],
                 "ORGANIZATION_NAME": args.organization or "",
                 "TZ": args.timezone or detect_timezone(),
@@ -513,7 +527,7 @@ def main() -> int:
         print("\n" + text["generated_password"].format(password=generated_password))
     for note in notes:
         print("\n" + note)
-    print("\n" + text["next"].format(url=values["PUBLIC_BASE_URL"], user=values["INITIAL_ADMIN_USERNAME"]))
+    print("\n" + text["next"].format(url=values["PUBLIC_BASE_URL"] or local_url(values["HTTP_PORT"]), user=values["INITIAL_ADMIN_USERNAME"]))
     return 0
 
 

@@ -16,6 +16,7 @@ os.environ.update(
         "INITIAL_SCREENS": "principal:Pantalla Principal,pasillo:Pantalla Pasillo,sala:Pantalla Sala",
         "DEFAULT_LANGUAGE": "en",
         "ALLOWED_NETWORKS": "",
+        "PUBLIC_BASE_URL": "",
         "GEOCODING_ENABLED": "false",
         "STORAGE_BACKEND": "local",
         "STORAGE_ROOT": tempfile.mkdtemp(prefix="board-test-storage-"),

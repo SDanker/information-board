@@ -5,8 +5,8 @@ import secrets
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
 from app.models import Content, ContentVersion, ShareToken
+from app.network import url_version
 
 
 def get_or_create_token(db: Session, content: Content) -> ShareToken:
@@ -20,12 +20,14 @@ def get_or_create_token(db: Session, content: Content) -> ShareToken:
     return token
 
 
-def share_url_for(token: ShareToken) -> str:
-    return f"{get_settings().public_base_url.rstrip('/')}/share/{token.token}"
+def share_url_for(token: ShareToken, base_url: str) -> str:
+    """Absolute share link; base_url comes from app.network.public_base_url for the current request."""
+    return f"{base_url}/share/{token.token}"
 
 
-def qr_url_for(token: ShareToken) -> str:
-    return f"/api/v1/public/share/{token.token}/qr.png"
+def qr_url_for(token: ShareToken, share_url: str) -> str:
+    # The fingerprint changes with the encoded address, so a cached image is never reused after a move.
+    return f"/api/v1/public/share/{token.token}/qr.png?v={url_version(share_url)}"
 
 
 def thumbnail_url_for(version: ContentVersion | None) -> str | None:

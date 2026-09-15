@@ -126,6 +126,8 @@ export type SystemStatus = {
   timezone: string;
   default_language: string;
   public_base_url: string;
+  public_base_url_mode: "auto" | "fixed";
+  public_base_url_is_loopback: boolean;
   allowed_networks: string | null;
   storage: { backend: "local" | "s3"; location: string; endpoint?: string };
   storage_bytes: number | null;

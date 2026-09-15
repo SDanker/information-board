@@ -33,7 +33,9 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./information_board.db"
     redis_url: str = "redis://localhost:6379/0"
     secret_key: str = DEVELOPMENT_SECRET_KEY
-    public_base_url: str = "http://localhost"
+    # Address used in QR codes and share links. Empty or "auto" = built from the address each
+    # visitor used to reach the server, so a new IP or network needs no change (app/network.py).
+    public_base_url: str = ""
     # Extra comma-separated origins allowed to call the API from a browser.
     cors_extra_origins: str = ""
     access_token_minutes: int = 480

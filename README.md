@@ -32,7 +32,7 @@ disk, NAS or S3-compatible cloud) and first administrator are all configurable.
 | **Settings → Branding** (in the app) | Application and organization name, logo (also the browser icon), primary color, default language, date format, time zone, login page headline and message, public library on/off |
 | **Settings → Page names** | The name of every menu page (Dashboard, Screens, Content, Playlists, Library, Schedule, Users, Audit, Settings) |
 | **Settings → Screens & TV** | Default seconds per item, minimum seconds per page/slide, seconds per emergency photo or map, spreadsheet rows per page, clock on/off and 12/24 h, emergency map on/off, TV footer text, QR code on/off, position and message |
-| **`.env`** (on the server) | First administrator username and password, initial screens, public address and port, storage backend (local folder, NAS over SMB or NFS, S3-compatible cloud), upload size limits, session length, login attempt limits, allowed networks, geocoding provider and countries, container user id |
+| **`.env`** (on the server) | First administrator username and password, initial screens, public address (automatic by default, so a new IP or network needs no change) and port, storage backend (local folder, NAS over SMB or NFS, S3-compatible cloud), upload size limits, session length, login attempt limits, allowed networks, geocoding provider and countries, container user id |
 
 Every visitor can also switch between English and Spanish with the language picker.
 

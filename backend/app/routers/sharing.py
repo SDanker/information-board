@@ -11,12 +11,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.branding import load_branding
-from app.config import get_settings
 from app.content_paths import safe_filename
 from app.database import get_db
 from app.file_responses import storage_file_response
 from app.i18n import _
 from app.models import Content, ContentVersion, ShareToken, User, utc_now
+from app.network import public_base_url
 from app.schemas import LibraryItem, PublicShareDetail, ShareDownloadItem, ShareInfo
 from app.security import require_editor
 from app.sharing_service import get_or_create_token, qr_url_for, share_url_for, thumbnail_url_for
@@ -25,11 +25,12 @@ from app.storage import content_disposition, get_storage
 router = APIRouter(tags=["sharing"])
 
 
-def _share_info(token: ShareToken) -> ShareInfo:
+def _share_info(token: ShareToken, base_url: str) -> ShareInfo:
+    share_url = share_url_for(token, base_url)
     return ShareInfo(
         token=token.token,
-        share_url=share_url_for(token),
-        qr_url=qr_url_for(token),
+        share_url=share_url,
+        qr_url=qr_url_for(token, share_url),
         download_url=f"/api/v1/public/share/{token.token}/download",
         revoked=token.revoked,
         download_count=token.download_count,
@@ -97,14 +98,20 @@ def _resolve_valid_token(db: Session, token_value: str) -> ShareToken:
 
 @router.get("/content/{content_id}/share", response_model=ShareInfo)
 def get_share_info(
-    content_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], _editor: Annotated[User, Depends(require_editor)]
+    content_id: uuid.UUID,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    _editor: Annotated[User, Depends(require_editor)],
 ) -> ShareInfo:
-    return _share_info(get_or_create_token(db, _load_content(db, content_id)))
+    return _share_info(get_or_create_token(db, _load_content(db, content_id)), public_base_url(request))
 
 
 @router.post("/content/{content_id}/share/rotate", response_model=ShareInfo)
 def rotate_share(
-    content_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], _editor: Annotated[User, Depends(require_editor)]
+    content_id: uuid.UUID,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    _editor: Annotated[User, Depends(require_editor)],
 ) -> ShareInfo:
     """Invalidate the current link/QR code and create a new one (e.g. if the old one leaked)."""
     content = _load_content(db, content_id)
@@ -112,7 +119,7 @@ def rotate_share(
     if existing is not None:
         existing.revoked = True
         db.commit()
-    return _share_info(get_or_create_token(db, content))
+    return _share_info(get_or_create_token(db, content), public_base_url(request))
 
 
 @router.get("/public/share/{token_value}", response_model=PublicShareDetail)
@@ -143,9 +150,9 @@ def public_share_detail(token_value: str, db: Annotated[Session, Depends(get_db)
 
 
 @router.get("/public/share/{token_value}/qr.png")
-def public_share_qr(token_value: str, db: Annotated[Session, Depends(get_db)]) -> Response:
+def public_share_qr(token_value: str, request: Request, db: Annotated[Session, Depends(get_db)]) -> Response:
     token = _resolve_valid_token(db, token_value)
-    image = qrcode.make(share_url_for(token), border=1)
+    image = qrcode.make(share_url_for(token, public_base_url(request)), border=1)
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
     return Response(content=buffer.getvalue(), media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
@@ -190,7 +197,7 @@ def public_share_download(token_value: str, request: Request, db: Annotated[Sess
 
 
 @router.get("/public/library", response_model=list[LibraryItem])
-def public_library(db: Annotated[Session, Depends(get_db)]) -> list[LibraryItem]:
+def public_library(request: Request, db: Annotated[Session, Depends(get_db)]) -> list[LibraryItem]:
     if not load_branding(db).public_library_enabled:
         raise HTTPException(status_code=404, detail=_("The public library is disabled"))
     contents = db.scalars(
@@ -200,7 +207,7 @@ def public_library(db: Annotated[Session, Depends(get_db)]) -> list[LibraryItem]
         .options(selectinload(Content.published_version).selectinload(ContentVersion.assets))
         .order_by(Content.updated_at.desc())
     ).all()
-    base = get_settings().public_base_url.rstrip("/")
+    base = public_base_url(request)
     items: list[LibraryItem] = []
     for content in contents:
         token = get_or_create_token(db, content)

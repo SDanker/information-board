@@ -8,6 +8,7 @@ from app.bootstrap import ensure_initial_data
 from app.config import get_settings
 from app.i18n import LanguageMiddleware
 from app.logging_config import configure_logging
+from app.network import configured_base_url
 from app.network_restriction import NetworkRestrictionMiddleware
 from app.realtime import manager as realtime_manager
 from app.routers import auth, branding, content, emergencies, health, operation, playlists, realtime, screens, sharing, users
@@ -35,8 +36,9 @@ settings = get_settings()
 if not settings.testing:
     configure_logging()
 
-cors_origins = [settings.public_base_url, "http://localhost", "http://localhost:3000"]
-cors_origins += [origin.strip() for origin in settings.cors_extra_origins.split(",") if origin.strip()]
+# The interface is served from the same origin as the API, so CORS only matters for integrations.
+cors_origins = [origin for origin in (configured_base_url(), "http://localhost", "http://localhost:3000") if origin]
+cors_origins +=[origin.strip() for origin in settings.cors_extra_origins.split(",") if origin.strip()]
 
 app = FastAPI(title=settings.app_name, version=__version__, lifespan=lifespan)
 # Starlette runs the last middleware added first: CORS, then language detection (so

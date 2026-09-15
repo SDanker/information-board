@@ -113,22 +113,44 @@ docker compose run --rm --no-deps -v "$(pwd)/backend/tests:/app/tests:ro" backen
 
 End-to-end browser tests: see [e2e/README.md](../e2e/README.md).
 
-## Changing the server address or port
+## When the network changes
+
+With `PUBLIC_BASE_URL` empty (the default), QR codes and share links are built from the address each
+device used to open the board, port included. If the server gets a new IP address or moves to
+another network, **nothing has to change in `.env`**: a TV opened at `http://10.0.0.8/screen/lobby`
+shows a QR code for `http://10.0.0.8/catalog/lobby`. **Settings → System** shows the address in use.
+
+The TVs still need an address to open. From most to least stable:
+
+1. **A name instead of an IP address.** Create a DNS record in your router or local DNS (for example
+   `board.lan`), or use mDNS: on a Linux server run `sudo apt install avahi-daemon` and open
+   `http://<server-hostname>.local`. mDNS works on Windows 10+, macOS, iOS, most Linux desktops and
+   recent Android; some smart TVs and older Android devices cannot resolve `.local` names.
+2. **A DHCP reservation** in the router, so the server always receives the same IP address.
+3. Otherwise, update the kiosk URL on each TV after the address changes.
+
+To restrict administration without tying it to one subnet, use `ALLOWED_NETWORKS=private`.
+
+Set `PUBLIC_BASE_URL` to a fixed value only when links must always use one address, for example
+when TVs open the board through `localhost` on the server itself, or behind a reverse proxy that
+does not forward the original host name.
+
+### Changing the port
 
 ```env
 HTTP_PORT=8080
-PUBLIC_BASE_URL=http://192.168.1.50:8080
 ```
 
-Then `docker compose up -d` and update the kiosk URLs on the TVs. QR codes follow the new address
-automatically.
+Then `docker compose up -d`. The board is reachable at `http://SERVER:8080` and QR codes include the
+port automatically. Update the kiosk URLs on the TVs.
 
 ## HTTPS
 
 The stack serves plain HTTP inside the local network. To expose it outside, place it behind a
-reverse proxy with a certificate (Caddy, Traefik, nginx Proxy Manager, Cloudflare Tunnel...), set
-`PUBLIC_BASE_URL=https://board.example.org` and consider `ALLOWED_NETWORKS` to keep administration
-limited to your internal network.
+reverse proxy with a certificate (Caddy, Traefik, nginx Proxy Manager, Cloudflare Tunnel...). Links
+switch to `https://` automatically when the proxy forwards the `Host` and `X-Forwarded-Proto`
+headers (most do by default); otherwise set `PUBLIC_BASE_URL=https://board.example.org`. Consider
+`ALLOWED_NETWORKS=private` to keep administration limited to your internal networks.
 
 ## Troubleshooting
 
@@ -141,8 +163,8 @@ limited to your internal network.
 | S3 errors in the logs | Check bucket name, region, endpoint, key permissions and `S3_FORCE_PATH_STYLE`. **Settings → System** shows the configured bucket. |
 | Uploads fail with "413" | Raise `NGINX_MAX_BODY_SIZE` and the matching `MAX_*_SIZE_MB`. |
 | A document stays "Processing" | `docker compose logs worker`; the worker needs to be healthy. Very large presentations can take a few minutes. |
-| A screen shows as offline | Keep the URL open on the TV and check that it can reach `PUBLIC_BASE_URL`. |
+| A screen shows as offline | Keep the URL open on the TV and check that it can still reach the server (see [when the network changes](#when-the-network-changes)). |
 | Sign-in is rejected | The `INITIAL_ADMIN_*` values only apply to the first start. Use `python -m app.cli reset-password`. Too many attempts block that IP for `LOGIN_WINDOW_SECONDS`. |
-| QR codes do not open on phones | `PUBLIC_BASE_URL` must be an address phones can reach (not `localhost`), and the phone must be on a network that reaches the server. |
+| QR codes do not open on phones | QR codes use the address the TV opened: open the screen with the server's network address or name, not `localhost` (or set a fixed `PUBLIC_BASE_URL`). The phone must be on a network that reaches the server. **Settings → System** warns when the address is `localhost`. |
 | Wrong time on TVs or schedules | Set the time zone in **Settings → Branding** (and `TZ` in `.env` for the containers). |
 | Emergency address not found | Check `GEOCODING_ENABLED`, Internet access from the server (or your own `GEOCODE_URL`) and `GEOCODE_COUNTRY_CODES`. |

@@ -11,10 +11,10 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.audit import record as record_audit
 from app.branding import load_branding
-from app.config import get_settings
 from app.database import get_db
 from app.i18n import _
 from app.models import ACTIVE_EMERGENCY_KEY, Content, ContentVersion, Playlist, PlaylistItem, Screen, SystemSetting, User
+from app.network import client_ip, public_base_url, url_version
 from app.scheduling import is_item_scheduled_now
 from app.schemas import HeartbeatRequest, LibraryItem, ScreenCreate, ScreenLibraryResponse, ScreenResponse, ScreenUpdate
 from app.schemas.branding_schemas import DisplaySettings
@@ -120,7 +120,7 @@ def public_screen(slug: str, db: Annotated[Session, Depends(get_db)]) -> ScreenR
 def heartbeat(slug: str, payload: HeartbeatRequest, request: Request, db: Annotated[Session, Depends(get_db)]) -> ScreenResponse:
     screen = _active_screen_or_404(db, slug)
     screen.last_seen_at = datetime.now(timezone.utc)
-    screen.last_ip = request.client.host if request.client else None
+    screen.last_ip = client_ip(request)
     screen.last_user_agent = request.headers.get("user-agent", "")[:500]
     if payload.resolution:
         screen.expected_resolution = payload.resolution
@@ -130,7 +130,7 @@ def heartbeat(slug: str, payload: HeartbeatRequest, request: Request, db: Annota
 
 
 @router.get("/public/screens/{slug}/playlist", response_model=PlaylistPlaybackResponse)
-def public_screen_playlist(slug: str, db: Annotated[Session, Depends(get_db)]) -> PlaylistPlaybackResponse:
+def public_screen_playlist(slug: str, request: Request, db: Annotated[Session, Depends(get_db)]) -> PlaylistPlaybackResponse:
     """Ordered list, already filtered by schedule, of what the screen must rotate right now.
 
     The TV client caches this response and rotates locally using duration_seconds,
@@ -153,6 +153,7 @@ def public_screen_playlist(slug: str, db: Annotated[Session, Depends(get_db)]) -
         return PlaylistPlaybackResponse(status="empty", items=[])
 
     display = load_branding(db).display
+    base_url = public_base_url(request)
     items: list[PlaylistPlaybackItem] = []
     for item in sorted(playlist.items, key=lambda entry: entry.order_index):
         content = item.content
@@ -177,7 +178,7 @@ def public_screen_playlist(slug: str, db: Annotated[Session, Depends(get_db)]) -
                 duration_seconds=item.duration_seconds,
                 payload=version.payload,
                 assets=_playback_assets(version),
-                qr=_resolve_qr_overlay(screen, content, display),
+                qr=_resolve_qr_overlay(screen, content, display, base_url),
             )
         )
     return PlaylistPlaybackResponse(status="ok" if items else "empty", items=items)
@@ -214,13 +215,14 @@ def public_active_emergency(db: Annotated[Session, Depends(get_db)]) -> Playlist
     return PlaylistPlaybackResponse(status="ok", items=[item])
 
 
-def _resolve_qr_overlay(screen: Screen, content: Content, display: DisplaySettings) -> dict | None:
+def _resolve_qr_overlay(screen: Screen, content: Content, display: DisplaySettings, base_url: str) -> dict | None:
     """QR badge for one playback item.
 
     The QR image always points to the screen's catalog (every shareable item of its
     playlist), never to the item currently on air: the code therefore stays identical
     while the playlist rotates, and a half-finished scan cannot switch to another code.
     Position and message come from branding unless the content overrides them.
+    base_url is the address this TV used, so the code follows the server to a new network.
     """
     if not display.show_qr or content.library_visibility == "PRIVATE":
         return None
@@ -228,17 +230,18 @@ def _resolve_qr_overlay(screen: Screen, content: Content, display: DisplaySettin
     content_config = content.qr_overlay or {}
     if screen_config.get("visible") is False or content_config.get("visible") is False:
         return None
-    base = get_settings().public_base_url.rstrip("/")
+    catalog_url = f"{base_url}/{CATALOG_ROUTE}/{screen.slug}"
     return {
         "position": content_config.get("position") or display.qr_position,
         "message": content_config.get("message") or display.qr_message or None,
-        "image_url": f"/api/v1/public/screens/{screen.slug}/library/qr.png",
-        "share_url": f"{base}/{CATALOG_ROUTE}/{screen.slug}",
+        # The fingerprint changes with the encoded address, so the TV never shows a cached old code.
+        "image_url": f"/api/v1/public/screens/{screen.slug}/library/qr.png?v={url_version(catalog_url)}",
+        "share_url": catalog_url,
     }
 
 
 @router.get("/public/screens/{slug}/library", response_model=ScreenLibraryResponse)
-def public_screen_library(slug: str, db: Annotated[Session, Depends(get_db)]) -> ScreenLibraryResponse:
+def public_screen_library(slug: str, request: Request, db: Annotated[Session, Depends(get_db)]) -> ScreenLibraryResponse:
     """Every shareable (non-private) item rotating on this screen, for the page its QR opens.
 
     Unlike /public/library (the general library), QR_ONLY content is listed here:
@@ -260,7 +263,7 @@ def public_screen_library(slug: str, db: Annotated[Session, Depends(get_db)]) ->
     if playlist is None or not playlist.is_active:
         return ScreenLibraryResponse(screen_name=screen.name, items=[])
 
-    base = get_settings().public_base_url.rstrip("/")
+    base = public_base_url(request)
     seen: set[uuid.UUID] = set()
     items: list[LibraryItem] = []
     for item in sorted(playlist.items, key=lambda entry: entry.order_index):
@@ -284,9 +287,9 @@ def public_screen_library(slug: str, db: Annotated[Session, Depends(get_db)]) ->
 
 
 @router.get("/public/screens/{slug}/library/qr.png")
-def public_screen_library_qr(slug: str, db: Annotated[Session, Depends(get_db)]) -> Response:
+def public_screen_library_qr(slug: str, request: Request, db: Annotated[Session, Depends(get_db)]) -> Response:
     screen = _active_screen_or_404(db, slug)
-    url = f"{get_settings().public_base_url.rstrip('/')}/{CATALOG_ROUTE}/{screen.slug}"
+    url = f"{public_base_url(request)}/{CATALOG_ROUTE}/{screen.slug}"
     image = qrcode.make(url, border=1)
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")

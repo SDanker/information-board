@@ -75,9 +75,9 @@ win. Use **Restore defaults** to go back to `.env`.
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `PUBLIC_BASE_URL` | `http://localhost` | Address phones and TVs use to reach the server. QR codes and share links point here: never use `localhost` in a real installation. Include the port if it is not 80. |
+| `PUBLIC_BASE_URL` | empty (automatic) | Address used in QR codes and share links. **Empty = automatic**: links use the address each TV, phone or computer used to open the board (including the port), so a new IP address or network needs no change. Set a fixed value only to force one address, e.g. `https://board.example.org` behind a reverse proxy. See [when the network changes](operations.md#when-the-network-changes). |
 | `HTTP_PORT` | `80` | Port published by nginx on the host. |
-| `ALLOWED_NETWORKS` | empty | Comma-separated subnets allowed to use the admin API, e.g. `192.168.1.0/24,10.0.0.0/8`. Screens (`/api/v1/public/*`), the health check and WebSockets are always reachable. Empty = no restriction. |
+| `ALLOWED_NETWORKS` | empty | Networks allowed to use the admin API, comma-separated. `private` allows every private network (10.x, 172.16-31.x, 192.168.x, private IPv6, localhost) and keeps working if the LAN changes; specific subnets such as `192.168.1.0/24` also work. Screens (`/api/v1/public/*`), the health check and WebSockets are always reachable. Empty = no restriction. |
 | `CORS_EXTRA_ORIGINS` | empty | Extra browser origins allowed to call the API, for custom integrations. |
 
 ### First administrator and screens

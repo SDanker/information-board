@@ -143,7 +143,7 @@ Ejemplos de `S3_ENDPOINT_URL` por proveedor:
 - `redirect`: el servidor responde con un enlace firmado válido por `S3_PRESIGN_SECONDS` y el
   navegador descarga directo desde el bucket. Menos carga para el servidor, pero cada TV y teléfono
   necesita acceso al endpoint del bucket, y el bucket puede requerir reglas CORS que permitan `GET`
-  desde `PUBLIC_BASE_URL`.
+  desde la dirección de la cartelera.
 
 El worker de videos y documentos descarga los originales a una carpeta temporal, los convierte y
 sube los resultados, así que las conversiones funcionan igual con S3.
