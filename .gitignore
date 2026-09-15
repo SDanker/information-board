@@ -1,0 +1,37 @@
+# Secrets and local configuration
+.env
+.env.backup-*
+
+# Runtime data (keep the placeholder folders)
+data/*
+!data/.gitkeep
+backups/*
+!backups/.gitkeep
+
+# Organization-specific material that must not be published (notes, logos, credentials)
+private/
+
+# Build and release artifacts
+dist/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+*.db
+
+# Node / Next.js
+node_modules/
+frontend/.next/
+e2e/test-results/
+e2e/playwright-report/
+
+# Editors, OS and tools
+*.log
+.validation/
+.DS_Store
+.claude/

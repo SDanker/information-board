@@ -1,0 +1,66 @@
+# Rendered by the official nginx image when the container starts: NGINX_MAX_BODY_SIZE comes
+# from docker-compose.yml, and every other dollar variable below belongs to nginx itself.
+# The file is included inside nginx's `http` block.
+
+client_max_body_size ${NGINX_MAX_BODY_SIZE};
+server_tokens off;
+
+map $http_upgrade $connection_upgrade {
+  default upgrade;
+  '' close;
+}
+
+# 127.0.0.11 is Docker's embedded DNS. Using `resolver` plus variables (instead of an
+# `upstream` block with the service names) makes nginx re-resolve the containers every 10s,
+# so recreating the backend or frontend does not leave nginx answering 502 until a restart.
+resolver 127.0.0.11 valid=10s ipv6=off;
+
+server {
+  listen 80;
+  server_name _;
+
+  add_header X-Content-Type-Options nosniff always;
+  add_header X-Frame-Options SAMEORIGIN always;
+  add_header Referrer-Policy strict-origin-when-cross-origin always;
+  add_header Permissions-Policy "camera=(), microphone=(), geolocation=(self)" always;
+
+  set $backend_upstream backend:8000;
+  set $frontend_upstream frontend:3000;
+
+  location = /nginx-health {
+    access_log off;
+    return 200 "ok\n";
+  }
+
+  location /api/ {
+    proxy_pass http://$backend_upstream;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+  }
+
+  location /ws/ {
+    proxy_pass http://$backend_upstream;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 1h;
+  }
+
+  location / {
+    proxy_pass http://$frontend_upstream;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}

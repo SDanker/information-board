@@ -1,0 +1,6 @@
+Prueba E2E de documento.
+
+Este archivo se sube como contenido tipo DOCUMENT, se convierte a PDF con
+LibreOffice dentro del contenedor y luego a páginas WebP con PyMuPDF.
+
+Contiene acentos y eñes para validar la codificación: áéíóú ñ ¿? ¡!

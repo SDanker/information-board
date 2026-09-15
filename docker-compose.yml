@@ -1,0 +1,140 @@
+name: information-board
+
+# Every application service reads .env (see .env.example). Values under `environment:` are
+# only the ones Compose itself must resolve, or defaults for variables that must always exist.
+
+x-backend-build: &backend-build
+  context: ./backend
+  args:
+    APP_UID: ${APP_UID:-1000}
+    APP_GID: ${APP_GID:-1000}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-information_board}
+      POSTGRES_USER: ${POSTGRES_USER:-information_board}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (run python3 scripts/setup.py)}
+      TZ: ${TZ:-UTC}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [board]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [board]
+
+  backend:
+    build: *backend-build
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env (run python3 scripts/setup.py)}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      TZ: ${TZ:-UTC}
+    # With STORAGE_BACKEND=local, uploaded files live in /data. The override files
+    # docker-compose.nas-smb.yml and docker-compose.nas-nfs.yml replace these mounts.
+    volumes:
+      - ${BOARD_DATA_PATH:-./data}:/data
+      - ${BOARD_BACKUPS_PATH:-./backups}:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks: [board]
+
+  worker:
+    build: *backend-build
+    restart: unless-stopped
+    command: ["python", "-m", "app.worker"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env (run python3 scripts/setup.py)}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ${BOARD_DATA_PATH:-./data}:/data
+      - ${BOARD_BACKUPS_PATH:-./backups}:/backups
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.worker_health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [board]
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_BASE: /api/v1
+      TZ: ${TZ:-UTC}
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks: [board]
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    environment:
+      # Substituted into nginx/templates/default.conf.template when the container starts.
+      NGINX_MAX_BODY_SIZE: ${NGINX_MAX_BODY_SIZE:-600m}
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/nginx-health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [board]
+
+networks:
+  board:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

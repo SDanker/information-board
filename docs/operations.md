@@ -1,0 +1,148 @@
+# Operations
+
+**English** · [Español](es/operacion.md)
+
+## Everyday commands
+
+```bash
+docker compose ps                  # every service should be "healthy"
+docker compose logs -f backend     # also: worker, frontend, nginx, postgres
+docker compose restart backend
+docker compose down                # stop (data is kept)
+docker compose up -d               # start
+```
+
+Data survives `docker compose down` and container re-creation. **Never** run
+`docker compose down -v` unless you really want to delete the PostgreSQL and Redis volumes.
+
+## Updating
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+Database migrations run automatically (`alembic upgrade head`) when the backend starts. Only the
+backend runs them; the worker waits until the backend is healthy. Make a backup first.
+
+Check the applied migration:
+
+```bash
+docker compose exec backend alembic current
+```
+
+## Command-line tools
+
+Run inside the backend container. When `--password` is omitted the password is asked without echo,
+which also keeps it out of the shell history.
+
+```bash
+docker compose exec backend python -m app.cli list-users
+docker compose exec backend python -m app.cli create-admin --username maria
+docker compose exec backend python -m app.cli reset-password --username admin
+docker compose exec backend python -m app.cli reset-password --username admin --activate   # also re-enable the account
+```
+
+Use `reset-password` if you forget the administrator password or if you changed
+`INITIAL_ADMIN_PASSWORD` after the first start (that variable only matters while there are no users).
+
+## Screens and kiosk mode
+
+1. In **Screens**, create a screen and assign a playlist. Its URL is `/screen/<slug>`.
+2. Open that URL in the TV's browser and enable full screen.
+3. Configure the device to open it automatically on startup:
+   - **Chromium / Chrome on Linux, Windows or mini PCs**:
+     `chromium --kiosk --noerrdialogs --disable-infobars --autoplay-policy=no-user-gesture-required http://SERVER-IP/screen/lobby`
+   - **Raspberry Pi OS**: add the same command to the desktop autostart.
+   - **Smart TVs / Android TV**: use a kiosk browser app with auto-start (e.g. Fully Kiosk Browser)
+     and allow autoplay.
+4. Disable the TV's energy saving and screen saver.
+
+Each screen sends a heartbeat every 15 seconds; **Screens** shows which ones are online. If the
+network drops, the TV keeps showing the last content it had and reconnects on its own. Changes to
+playlists, branding, display settings and emergencies reach open screens in real time.
+
+## Backups
+
+From the project folder on the Docker host (Linux, macOS or WSL):
+
+```bash
+bash scripts/backup.sh
+```
+
+The script stops `backend` and `worker` for a few seconds (so nothing writes while copying),
+creates `backups/information-board-<timestamp>/` with `database.dump`, `data.tar.gz` (skipped with
+S3 storage), `manifest.sha256` and `info.txt`, and starts the services again. Set `BACKUP_KEEP` in
+`.env` to keep only the most recent N backups.
+
+**`.env` is not included** because it holds secrets: keep a protected copy separately.
+
+Schedule it with cron, for example every night at 03:00:
+
+```cron
+0 3 * * * cd /opt/information-board && bash scripts/backup.sh >> backups/backup.log 2>&1
+```
+
+## Restore
+
+```bash
+bash scripts/restore.sh information-board-20260101T030000Z
+```
+
+The script verifies the checksums, asks you to type `yes`, stops `backend` and `worker`, replaces
+the database, extracts the files and starts the services again. Test restores periodically on a
+separate machine, not only during a real incident.
+
+## Verifying an installation
+
+```bash
+docker compose config --quiet                 # the configuration is valid
+curl http://localhost/api/v1/health           # {"status":"ok","database":"ok","redis":"ok"}
+docker compose exec -T backend python - < scripts/deployment_smoke.py
+```
+
+The smoke test signs in with the initial administrator (pass `-e SMOKE_PASSWORD=...` if that
+password was changed), checks the main routes, creates a temporary publication and playlist, checks
+playback on the first screen and removes everything it created.
+
+Backend unit tests inside the container:
+
+```bash
+docker compose run --rm --no-deps -v "$(pwd)/backend/tests:/app/tests:ro" backend sh -c "pip install -q moto[s3]==5.0.18 && python -m pytest -q"
+```
+
+End-to-end browser tests: see [e2e/README.md](../e2e/README.md).
+
+## Changing the server address or port
+
+```env
+HTTP_PORT=8080
+PUBLIC_BASE_URL=http://192.168.1.50:8080
+```
+
+Then `docker compose up -d` and update the kiosk URLs on the TVs. QR codes follow the new address
+automatically.
+
+## HTTPS
+
+The stack serves plain HTTP inside the local network. To expose it outside, place it behind a
+reverse proxy with a certificate (Caddy, Traefik, nginx Proxy Manager, Cloudflare Tunnel...), set
+`PUBLIC_BASE_URL=https://board.example.org` and consider `ALLOWED_NETWORKS` to keep administration
+limited to your internal network.
+
+## Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| The site does not open | `docker compose ps`, the host firewall, and that `HTTP_PORT` is not used by another program. |
+| The backend exits right after starting | `docker compose logs backend`. "Refusing to start" lists the settings that still hold placeholder values. A password mismatch between `POSTGRES_PASSWORD` and `DATABASE_URL` is the other usual cause. |
+| `Permission denied` writing to `/data` | The data folder must belong to `APP_UID:APP_GID` (see [storage](storage.md#permissions-options-a-c)). |
+| NAS volume fails to mount | Install `cifs-utils` / `nfs-common` on the host, check the share name, credentials and export permissions, and recreate the volumes after changing `NAS_*`. |
+| S3 errors in the logs | Check bucket name, region, endpoint, key permissions and `S3_FORCE_PATH_STYLE`. **Settings → System** shows the configured bucket. |
+| Uploads fail with "413" | Raise `NGINX_MAX_BODY_SIZE` and the matching `MAX_*_SIZE_MB`. |
+| A document stays "Processing" | `docker compose logs worker`; the worker needs to be healthy. Very large presentations can take a few minutes. |
+| A screen shows as offline | Keep the URL open on the TV and check that it can reach `PUBLIC_BASE_URL`. |
+| Sign-in is rejected | The `INITIAL_ADMIN_*` values only apply to the first start. Use `python -m app.cli reset-password`. Too many attempts block that IP for `LOGIN_WINDOW_SECONDS`. |
+| QR codes do not open on phones | `PUBLIC_BASE_URL` must be an address phones can reach (not `localhost`), and the phone must be on a network that reaches the server. |
+| Wrong time on TVs or schedules | Set the time zone in **Settings → Branding** (and `TZ` in `.env` for the containers). |
+| Emergency address not found | Check `GEOCODING_ENABLED`, Internet access from the server (or your own `GEOCODE_URL`) and `GEOCODE_COUNTRY_CODES`. |

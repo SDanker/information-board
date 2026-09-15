@@ -1,0 +1,3 @@
+-r requirements.txt
+# In-memory S3 used by the storage tests; they are skipped when it is not installed.
+moto[s3]==5.0.18
