@@ -107,7 +107,7 @@ export const adminMessages = defineMessages(
     "audit.entity.content": "content",
     "audit.entity.playlist": "playlist",
     "audit.entity.user": "user",
-    "audit.entity.emergency": "emergency",
+    "audit.entity.emergency": "featured event",
     "audit.entity.branding": "customization",
   },
   {
@@ -216,7 +216,7 @@ export const adminMessages = defineMessages(
     "audit.entity.content": "contenido",
     "audit.entity.playlist": "playlist",
     "audit.entity.user": "usuario",
-    "audit.entity.emergency": "emergencia",
+    "audit.entity.emergency": "acto destacado",
     "audit.entity.branding": "personalización",
   },
 );

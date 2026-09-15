@@ -2,15 +2,19 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import {
-  AlertTriangle, Check, Clock3, Copy, FileText, Image as ImageIcon, Layers, MapPin, Megaphone,
+  AlertTriangle, CalendarClock, Check, Clock3, Copy, FileText, Image as ImageIcon, Layers, MapPin, Megaphone,
   Pencil, Plus, RefreshCw, RotateCw, Share2, ShieldOff, Trash2, X,
 } from "lucide-react";
 
 import AdminShell from "@/components/AdminShell";
 import { API_BASE, apiFetch, Content, ContentKind, ShareInfo, uploadWithProgress } from "@/lib/api";
 import { useAuthReady } from "@/lib/auth";
+import { useBranding } from "@/lib/branding";
 import { KIND_ICONS } from "@/lib/contentKinds";
 import { MessageKey, useI18n } from "@/lib/i18n";
+import {
+  addDaysToInput, DEFAULT_PUBLICATION_DAYS, nowInputValue, PUBLICATION_PRESETS, publicationPeriodLabel, toggleWeekday, toInputValue, WEEK_DAYS,
+} from "@/lib/publication";
 
 const BACKGROUNDS = ["brand", "dark", "light"] as const;
 const VISIBILITIES = ["LOCAL_PUBLIC", "QR_ONLY", "PRIVATE"] as const;
@@ -62,6 +66,9 @@ function StatusBadge({ content }: { content: Content }) {
   const version = content.latest_version;
   const status = version?.status ?? "PENDING";
   if (status === "READY") {
+    if (content.publication_status === "scheduled") return <span className="status-badge processing"><Clock3 size={12} />{t("content.status.scheduled")}</span>;
+    if (content.publication_status === "off_day") return <span className="status-badge processing"><Clock3 size={12} />{t("content.status.offDay")}</span>;
+    if (content.publication_status === "expired") return <span className="status-badge offline"><i />{t("content.status.expired")}</span>;
     return <span className="status-badge online"><i />{t("content.status.published")}{version ? ` · v${version.version_number}` : ""}</span>;
   }
   if (status === "FAILED") return <span className="status-badge offline"><AlertTriangle size={12} />{t("content.status.error")}</span>;
@@ -70,7 +77,8 @@ function StatusBadge({ content }: { content: Content }) {
 
 export default function ContentPage() {
   const ready = useAuthReady();
-  const { t, tp } = useI18n();
+  const { t, tp, formatDateTime } = useI18n();
+  const { branding } = useBranding();
   const [items, setItems] = useState<Content[]>([]);
   const [activeEmergencyId, setActiveEmergencyId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Content | null>(null);
@@ -93,6 +101,10 @@ export default function ContentPage() {
   const [pagesFor, setPagesFor] = useState<Content | null>(null);
   const [pageDurations, setPageDurations] = useState<Record<string, string>>({});
   const [pagesSaving, setPagesSaving] = useState(false);
+  // Publication period being edited in the form, as datetime-local values ("" = no limit).
+  const [pubStart, setPubStart] = useState("");
+  const [pubEnd, setPubEnd] = useState("");
+  const [pubDays, setPubDays] = useState<number[]>([]);
 
   const kindLabel = (value: ContentKind) => t(`kind.${value}` as MessageKey);
 
@@ -132,40 +144,56 @@ export default function ContentPage() {
     setEditing(null);
     setKind("ANNOUNCEMENT");
     setSections([{ label: "", text: "" }]);
+    // Pre-filled with the default period (now → now + default length) so it can be adjusted right away.
+    const start = nowInputValue(branding?.timezone);
+    const defaultDays = branding?.display.default_publication_days ?? DEFAULT_PUBLICATION_DAYS;
+    setPubStart(start);
+    setPubEnd(defaultDays > 0 ? addDaysToInput(start, defaultDays) : "");
+    setPubDays([]);
     setShowForm(true);
   }
 
   function openEdit(item: Content) {
     setEditing(item);
     setKind(item.kind);
+    setPubStart(toInputValue(item.publish_start_at));
+    setPubEnd(toInputValue(item.publish_end_at));
+    setPubDays(item.publish_days ?? []);
     setShowForm(true);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSaving(true);
     setError("");
+    if (kind !== "EMERGENCY" && pubStart && pubEnd && pubEnd <= pubStart) {
+      setError(t("content.publication.endBeforeStart"));
+      return;
+    }
+    setSaving(true);
     const data = new FormData(event.currentTarget);
+    // Empty start = immediately, empty end = no end date, no weekday selected = every day.
+    const publication = { publish_start_at: pubStart || null, publish_end_at: pubEnd || null, publish_days: pubDays.length ? pubDays : null };
     try {
-      if (kind === "ANNOUNCEMENT") {
-        const announcement = { body: String(data.get("body") ?? ""), background: String(data.get("background") ?? "brand") };
-        if (editing) {
-          await apiFetch(`/content/${editing.id}`, {
-            method: "PATCH",
-            body: JSON.stringify({ title: data.get("title"), library_visibility: data.get("visibility") }),
-          });
+      if (editing) {
+        await apiFetch(`/content/${editing.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ title: data.get("title"), library_visibility: data.get("visibility"), ...publication }),
+        });
+        if (kind === "ANNOUNCEMENT") {
+          const announcement = { body: String(data.get("body") ?? ""), background: String(data.get("background") ?? "brand") };
           await apiFetch(`/content/${editing.id}/versions`, {
             method: "POST",
             body: JSON.stringify({ kind: "ANNOUNCEMENT", title: data.get("title"), announcement }),
           });
-          setMessage(t("content.updated"));
-        } else {
-          await apiFetch("/content", {
-            method: "POST",
-            body: JSON.stringify({ kind: "ANNOUNCEMENT", title: data.get("title"), library_visibility: data.get("visibility"), announcement }),
-          });
-          setMessage(t("content.created"));
         }
+        setMessage(t("content.updated"));
+      } else if (kind === "ANNOUNCEMENT") {
+        const announcement = { body: String(data.get("body") ?? ""), background: String(data.get("background") ?? "brand") };
+        await apiFetch("/content", {
+          method: "POST",
+          body: JSON.stringify({ kind: "ANNOUNCEMENT", title: data.get("title"), library_visibility: data.get("visibility"), announcement, ...publication }),
+        });
+        setMessage(t("content.created"));
       } else if (kind === "EMERGENCY") {
         await apiFetch("/emergencies", {
           method: "POST",
@@ -184,6 +212,9 @@ export default function ContentPage() {
         upload.set("kind", kind);
         upload.set("title", String(data.get("title") ?? ""));
         upload.set("library_visibility", String(data.get("visibility") ?? "LOCAL_PUBLIC"));
+        upload.set("publish_start_at", pubStart);
+        upload.set("publish_end_at", pubEnd);
+        upload.set("publish_days", pubDays.join(","));
         upload.set("file", file);
         await apiFetch("/content/upload", { method: "POST", body: upload });
         setMessage(t("content.uploaded"));
@@ -438,6 +469,14 @@ export default function ContentPage() {
               )}
               {item.kind === "PPTX" && <dl><div><dt>{t("content.slides")}</dt><dd>{pageCountLabel}</dd></div></dl>}
               {item.kind === "DOCUMENT" && <dl><div><dt>{t("content.pages")}</dt><dd>{pageCountLabel}</dd></div></dl>}
+              {!isEmergency && (
+                <dl>
+                  <div><dt>{t("content.publication.period")}</dt><dd>{publicationPeriodLabel(item, { t, formatDateTime })}</dd></div>
+                  {item.publish_days && item.publish_days.length > 0 && (
+                    <div><dt>{t("content.publication.weekdaysShort")}</dt><dd>{item.publish_days.map((day) => t(`day.short.${day}` as MessageKey)).join(" · ")}</dd></div>
+                  )}
+                </dl>
+              )}
               {uploadProgress[item.id] != null && (
                 <div className="upload-progress">
                   <div className="upload-progress-bar"><span style={{ width: `${uploadProgress[item.id]}%` }} /></div>
@@ -445,7 +484,7 @@ export default function ContentPage() {
                 </div>
               )}
               <div className="screen-card-actions">
-                {item.kind === "ANNOUNCEMENT" && <button onClick={() => openEdit(item)} className="success-text"><Pencil size={16} /> {t("common.edit")}</button>}
+                {!isEmergency && <button onClick={() => openEdit(item)} className="success-text"><Pencil size={16} /> {t("common.edit")}</button>}
                 {failed && <button onClick={() => retry(item)} className="success-text"><RotateCw size={16} /> {t("content.retry")}</button>}
                 {pageCount > 1 && <button onClick={() => openPages(item)}><Layers size={16} /> {t("content.pagesAction")}</button>}
                 {isEmergency && <button onClick={() => openLocation(item)}><MapPin size={16} /> {t("content.locationAction")}</button>}
@@ -507,7 +546,7 @@ export default function ContentPage() {
                   <label className="full">{t("content.form.description")}<textarea name="description" rows={3} maxLength={4000} /></label>
                 </>
               )}
-              {UPLOAD_ACCEPT[kind] && (
+              {UPLOAD_ACCEPT[kind] && !editing && (
                 <label className="full">
                   {t("content.form.file")}
                   <input type="file" name="file" accept={UPLOAD_ACCEPT[kind]} required />
@@ -523,6 +562,49 @@ export default function ContentPage() {
                 </label>
               )}
             </div>
+            {kind !== "EMERGENCY" && (
+              <fieldset className="publication-fields">
+                <legend><CalendarClock size={15} /> {t("content.publication.title")}</legend>
+                <div className="form-grid">
+                  <label>
+                    {t("content.publication.start")}
+                    <input type="datetime-local" value={pubStart} onChange={(event) => setPubStart(event.target.value)} />
+                  </label>
+                  <label>
+                    {t("content.publication.end")}
+                    <input type="datetime-local" value={pubEnd} min={pubStart || undefined} onChange={(event) => setPubEnd(event.target.value)} />
+                  </label>
+                </div>
+                <div className="publication-presets">
+                  {PUBLICATION_PRESETS.map((days) => (
+                    <button
+                      type="button"
+                      key={days}
+                      className={pubStart && pubEnd === addDaysToInput(pubStart, days) ? "active" : ""}
+                      onClick={() => setPubEnd(addDaysToInput(pubStart || nowInputValue(branding?.timezone), days))}
+                    >
+                      {tp("content.publication.days", days)}
+                    </button>
+                  ))}
+                  <button type="button" className={pubEnd ? "" : "active"} onClick={() => setPubEnd("")}>{t("content.publication.noEnd")}</button>
+                </div>
+                <span className="publication-label">{t("content.publication.weekdays")}</span>
+                <div className="day-picker">
+                  {WEEK_DAYS.map((day) => (
+                    <button
+                      type="button"
+                      key={day}
+                      aria-pressed={pubDays.includes(day)}
+                      className={pubDays.includes(day) ? "day-active" : ""}
+                      onClick={() => setPubDays((previous) => toggleWeekday(previous, day))}
+                    >
+                      {t(`day.short.${day}` as MessageKey)}
+                    </button>
+                  ))}
+                </div>
+                <small className="form-hint">{t("content.publication.hint")}</small>
+              </fieldset>
+            )}
             {kind === "EMERGENCY" && (
               <div className="emergency-sections">
                 <p className="nav-label">{t("content.form.sections")}</p>

@@ -4,7 +4,7 @@
 
 Cartelera digital autoalojada para oficinas, colegios, hospitales y plantas. Administra pantallas
 y playlists desde el navegador, publica anuncios, imágenes, videos, documentos, planillas y
-presentaciones, e interrumpe todas las TV con una transmisión de emergencia en tiempo real.
+presentaciones, e interrumpe todas las TV con la transmisión de un acto destacado en tiempo real.
 
 Todo funciona con Docker Compose en un solo servidor dentro de tu red local. La interfaz está
 disponible en **inglés y español**, y se pueden configurar el nombre, logo, colores, nombres de
@@ -16,8 +16,10 @@ páginas, almacenamiento (disco local, NAS o nube compatible con S3) y el primer
   para modo kiosco, sigue mostrando el último contenido conocido si se corta la conexión.
 - **Contenido**: anuncios, imágenes, videos (convertidos con ffmpeg), documentos, planillas y
   presentaciones (convertidos con LibreOffice), con duración por página o diapositiva.
+- **Períodos de publicación**: cada publicación dura 7 días por defecto (configurable); al crearla se
+  define fecha y hora de inicio y término y los días de la semana en que aparece, sin importar las playlists.
 - **Playlists y programación**: orden, duración por elemento, vigencia por fecha, día y hora.
-- **Emergencias**: geocodificación de direcciones, mapa, fotos y videos, y una transmisión que
+- **Actos destacados**: geocodificación de direcciones, mapa, fotos y videos, y una transmisión que
   toma todas las pantallas al instante mediante WebSockets.
 - **Códigos QR y páginas públicas**: cada pantalla muestra un QR que abre el catálogo de todo lo
   que hay en su playlist, con descargas individuales y en zip; biblioteca pública opcional.
@@ -31,7 +33,7 @@ páginas, almacenamiento (disco local, NAS o nube compatible con S3) y el primer
 | --- | --- |
 | **Configuración → Marca** (en la aplicación) | Nombre de la aplicación y de la organización, logo (también ícono del navegador), color principal, idioma por defecto, formato de fecha, zona horaria, titular y mensaje del inicio de sesión, biblioteca pública sí/no |
 | **Configuración → Nombres de páginas** | El nombre de cada página del menú (Panel, Pantallas, Publicaciones, Playlists, Biblioteca, Programación, Usuarios, Auditoría, Configuración) |
-| **Configuración → Pantallas y TV** | Segundos por defecto por elemento, segundos mínimos por página/diapositiva, segundos por foto o mapa de emergencia, filas por página en planillas, reloj sí/no y 12/24 h, mapa de emergencia sí/no, texto del pie en la TV, código QR sí/no, posición y mensaje |
+| **Configuración → Pantallas y TV** | Duración por defecto de las publicaciones (7 días), segundos por defecto por elemento, segundos mínimos por página/diapositiva, segundos por foto o mapa de acto destacado, filas por página en planillas, reloj sí/no y 12/24 h, mapa de acto destacado sí/no, texto del pie en la TV, código QR sí/no, posición y mensaje |
 | **`.env`** (en el servidor) | Usuario y contraseña del primer administrador, pantallas iniciales, dirección pública (automática por defecto, así una IP o red nueva no requiere cambios) y puerto, almacenamiento (carpeta local, NAS por SMB o NFS, nube compatible con S3), límites de tamaño de subida, duración de la sesión, límite de intentos de inicio de sesión, redes permitidas, proveedor y países de geocodificación, id de usuario de los contenedores |
 
 Además, cada visitante puede cambiar entre inglés y español con el selector de idioma.

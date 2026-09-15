@@ -60,7 +60,7 @@ Use `reset-password` if you forget the administrator password or if you changed
 
 Each screen sends a heartbeat every 15 seconds; **Screens** shows which ones are online. If the
 network drops, the TV keeps showing the last content it had and reconnects on its own. Changes to
-playlists, branding, display settings and emergencies reach open screens in real time.
+playlists, branding, display settings and featured events reach open screens in real time.
 
 ## Backups
 
@@ -167,4 +167,4 @@ headers (most do by default); otherwise set `PUBLIC_BASE_URL=https://board.examp
 | Sign-in is rejected | The `INITIAL_ADMIN_*` values only apply to the first start. Use `python -m app.cli reset-password`. Too many attempts block that IP for `LOGIN_WINDOW_SECONDS`. |
 | QR codes do not open on phones | QR codes use the address the TV opened: open the screen with the server's network address or name, not `localhost` (or set a fixed `PUBLIC_BASE_URL`). The phone must be on a network that reaches the server. **Settings → System** warns when the address is `localhost`. |
 | Wrong time on TVs or schedules | Set the time zone in **Settings → Branding** (and `TZ` in `.env` for the containers). |
-| Emergency address not found | Check `GEOCODING_ENABLED`, Internet access from the server (or your own `GEOCODE_URL`) and `GEOCODE_COUNTRY_CODES`. |
+| Featured event address not found | Check `GEOCODING_ENABLED`, Internet access from the server (or your own `GEOCODE_URL`) and `GEOCODE_COUNTRY_CODES`. |

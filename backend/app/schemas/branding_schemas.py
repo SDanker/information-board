@@ -30,6 +30,8 @@ class DisplaySettings(BaseModel):
     qr_position: Literal["bottom-right", "bottom-left", "top-right", "top-left"] = "bottom-right"
     qr_message: str = Field(default="", max_length=80)
     show_emergency_map: bool = True
+    # Length of the default publication period of new content, in days; 0 = no end date.
+    default_publication_days: int = Field(default=7, ge=0, le=3650)
 
 
 class BrandingSettings(BaseModel):

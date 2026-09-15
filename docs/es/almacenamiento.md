@@ -2,7 +2,7 @@
 
 [English](../storage.md) · **Español**
 
-Los originales subidos, las páginas convertidas, los videos procesados, el material de emergencias
+Los originales subidos, las páginas convertidas, los videos procesados, el material de actos destacados
 y el logo se pueden guardar de cuatro formas. La base de datos siempre queda en el volumen Docker
 `postgres_data`.
 

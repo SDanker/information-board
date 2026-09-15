@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     initial_admin_password: str = "CHANGE_ME_BEFORE_USE"
     # Comma-separated "slug:Name" pairs; empty = one default screen in the default language.
     initial_screens: str = ""
+    # Initial default publication length of new content in days (0 = no end date).
+    default_publication_days: int = 7
 
     # Security.
     allowed_networks: str = ""

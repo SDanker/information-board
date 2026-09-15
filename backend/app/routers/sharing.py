@@ -17,6 +17,7 @@ from app.file_responses import storage_file_response
 from app.i18n import _
 from app.models import Content, ContentVersion, ShareToken, User, utc_now
 from app.network import public_base_url
+from app.scheduling import is_published_now
 from app.schemas import LibraryItem, PublicShareDetail, ShareDownloadItem, ShareInfo
 from app.security import require_editor
 from app.sharing_service import get_or_create_token, qr_url_for, share_url_for, thumbnail_url_for
@@ -92,6 +93,9 @@ def _resolve_valid_token(db: Session, token_value: str) -> ShareToken:
         raise not_found
     content = token.content
     if content is None or content.deleted_at is not None or content.is_archived or content.library_visibility == "PRIVATE":
+        raise not_found
+    # Links follow the publication period: before it starts or after it ends they do not open.
+    if not is_published_now(content):
         raise not_found
     return token
 
@@ -210,6 +214,8 @@ def public_library(request: Request, db: Annotated[Session, Depends(get_db)]) ->
     base = public_base_url(request)
     items: list[LibraryItem] = []
     for content in contents:
+        if not is_published_now(content):
+            continue
         token = get_or_create_token(db, content)
         items.append(
             LibraryItem(

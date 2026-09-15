@@ -3,7 +3,7 @@ import { defineMessages } from "../core";
 export const boardMessages = defineMessages(
   {
     "board.onAir": "ON AIR",
-    "board.emergency": "EMERGENCY IN PROGRESS",
+    "board.emergency": "FEATURED EVENT",
     "board.processingDocument": "This document is still being processed.",
     "board.processingImage": "Image being processed.",
     "board.processingVideo": "Video being processed.",
@@ -23,7 +23,7 @@ export const boardMessages = defineMessages(
   },
   {
     "board.onAir": "AL AIRE",
-    "board.emergency": "EMERGENCIA EN CURSO",
+    "board.emergency": "ACTO DESTACADO",
     "board.processingDocument": "Este documento todavía se está procesando.",
     "board.processingImage": "Imagen en procesamiento.",
     "board.processingVideo": "Video en procesamiento.",

@@ -4,7 +4,7 @@
 
 Self-hosted digital signage for offices, schools, hospitals and factories. Manage screens and
 playlists from a browser, publish announcements, images, videos, documents, spreadsheets and
-presentations, and interrupt every TV with an emergency broadcast in real time.
+presentations, and interrupt every TV with a featured event broadcast in real time.
 
 Everything runs with Docker Compose on a single server in your local network. The interface is
 available in **English and Spanish**, and the name, logo, colors, page names, storage (local
@@ -16,8 +16,10 @@ disk, NAS or S3-compatible cloud) and first administrator are all configurable.
   keeps playing the last known content if the connection drops.
 - **Content**: announcements, images, videos (transcoded with ffmpeg), documents, spreadsheets
   and presentations (converted with LibreOffice), with per-page or per-slide durations.
+- **Publication periods**: every publication lasts 7 days by default (configurable); set its start
+  and end date and time and the weekdays it appears when creating it, independently of playlists.
 - **Playlists and schedule**: ordering, per-item duration, validity by date, weekday and time.
-- **Emergencies**: address geocoding, map, photos and videos, and a broadcast that takes over
+- **Featured events**: address geocoding, map, photos and videos, and a broadcast that takes over
   every screen instantly through WebSockets.
 - **QR codes and public pages**: each screen shows a QR that opens the catalog of everything in
   its playlist, with per-item downloads and zip archives; optional public library.
@@ -31,7 +33,7 @@ disk, NAS or S3-compatible cloud) and first administrator are all configurable.
 | --- | --- |
 | **Settings → Branding** (in the app) | Application and organization name, logo (also the browser icon), primary color, default language, date format, time zone, login page headline and message, public library on/off |
 | **Settings → Page names** | The name of every menu page (Dashboard, Screens, Content, Playlists, Library, Schedule, Users, Audit, Settings) |
-| **Settings → Screens & TV** | Default seconds per item, minimum seconds per page/slide, seconds per emergency photo or map, spreadsheet rows per page, clock on/off and 12/24 h, emergency map on/off, TV footer text, QR code on/off, position and message |
+| **Settings → Screens & TV** | Default publication length (7 days), default seconds per item, minimum seconds per page/slide, seconds per featured event photo or map, spreadsheet rows per page, clock on/off and 12/24 h, featured event map on/off, TV footer text, QR code on/off, position and message |
 | **`.env`** (on the server) | First administrator username and password, initial screens, public address (automatic by default, so a new IP or network needs no change) and port, storage backend (local folder, NAS over SMB or NFS, S3-compatible cloud), upload size limits, session length, login attempt limits, allowed networks, geocoding provider and countries, container user id |
 
 Every visitor can also switch between English and Spanish with the language picker.

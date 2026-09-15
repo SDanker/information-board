@@ -42,12 +42,29 @@ default name.
 | --- | --- | --- |
 | Default seconds per playlist item | 15 | Used when an item has no duration of its own. |
 | Minimum seconds per page or slide | 4 | Multi-page documents and presentations stay on screen until every page has been shown. Individual pages can have their own duration. |
-| Seconds per emergency photo or map | 7 | Emergency videos always play to the end. |
+| Seconds per featured event photo or map | 7 | Featured event videos always play to the end. |
 | Spreadsheet rows per page | 14 | Large tables are split into several pages. |
+| Default publication length (days) | 7 | New publications start when they are created and end after this many days. 0 = no end date. Initial value: `DEFAULT_PUBLICATION_DAYS`. |
 | Show the clock / 24-hour clock | on / on | |
-| Show the map during emergencies | on | |
+| Show the map during featured events | on | |
 | TV footer text | empty | Replaces the screen path shown at the bottom left. |
 | QR code: show, position, message | on, bottom right | The QR opens `/catalog/<slug>` with every item in the screen's playlist. |
+
+### Publication period
+
+Every publication except featured events (which are broadcast and stopped by hand) has a period,
+set when it is created and editable later with **Edit**:
+
+- **Starts / Ends**: date and time in the installation's time zone. Empty start = immediately;
+  empty end = no end date. New publications are pre-filled with *now* → *now + default length*,
+  and quick buttons set 1, 7, 14 or 30 days.
+- **Days**: optionally show it only on some weekdays inside the period (none selected = every day).
+
+Outside its period a publication is not shown on any screen, whichever playlists include it, and
+it disappears from screen catalogs, the public library and share links. Playlist items can still
+add their own dates, days and hours on top. **Schedule** lists every publication with its period
+and status (published, scheduled, not today, expired). Publications created before this option
+existed have no limits.
 
 ### Language picker
 
@@ -121,7 +138,7 @@ The PostgreSQL password is fixed when the database volume is first created; chan
 | Variable | Default | Description |
 | --- | --- | --- |
 | `MAX_DOCUMENT_SIZE_MB` | `100` | Documents, spreadsheets and presentations. |
-| `MAX_IMAGE_SIZE_MB` | `25` | Images, including emergency photos. |
+| `MAX_IMAGE_SIZE_MB` | `25` | Images, including featured event photos. |
 | `MAX_VIDEO_SIZE_MB` | `500` | Videos. |
 | `MAX_LOGO_SIZE_MB` | `5` | Logo in Settings. |
 | `NGINX_MAX_BODY_SIZE` | `600m` | Largest request nginx accepts; keep it above the largest limit. |
@@ -132,11 +149,11 @@ The PostgreSQL password is fixed when the database volume is first created; chan
 `BACKUP_KEEP`, the `NAS_*` variables and the `S3_*` variables are explained in
 [storage.md](storage.md).
 
-### Emergency geocoding
+### Featured event geocoding
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `GEOCODING_ENABLED` | `true` | Turns address search for emergencies on or off. Without it, emergencies still work but show no map. |
+| `GEOCODING_ENABLED` | `true` | Turns address search for featured events on or off. Without it, featured events still work but show no map. |
 | `GEOCODE_URL` | OpenStreetMap Nominatim | Any Nominatim-compatible `/search` endpoint, e.g. a self-hosted instance for networks without Internet access. |
 | `GEOCODE_COUNTRY_CODES` | empty | ISO country codes that restrict results, e.g. `cl` or `us,ca`. Empty = worldwide. |
 | `GEOCODE_USER_AGENT` | empty | Identifies your installation (OpenStreetMap's usage policy asks for it), e.g. `information-board (it@example.org)`. |

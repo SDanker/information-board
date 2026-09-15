@@ -2,12 +2,13 @@ import { test, expect } from "@playwright/test";
 
 import { authHeaders, cleanUp, createScreen, login, uniqueSlug } from "./helpers";
 
-test.describe("Emergency flow", () => {
-  test("creating, broadcasting and stopping an emergency is reflected on a TV", async ({ page, context, baseURL }) => {
+// Featured events are the EMERGENCY content kind internally (API routes /emergencies).
+test.describe("Featured event flow", () => {
+  test("creating, broadcasting and stopping a featured event is reflected on a TV", async ({ page, context, baseURL }) => {
     await login(page);
     const headers = await authHeaders(page);
-    const title = `E2E Emergency ${uniqueSlug("e2e")}`;
-    const screenSlug = uniqueSlug("e2e-emergency-screen");
+    const title = `E2E Featured event ${uniqueSlug("e2e")}`;
+    const screenSlug = uniqueSlug("e2e-event-screen");
     let screenId: string | undefined;
 
     try {
@@ -15,11 +16,11 @@ test.describe("Emergency flow", () => {
 
       await page.goto("/admin/content");
       await page.getByRole("button", { name: "New publication" }).click();
-      await page.getByRole("button", { name: "Emergency", exact: true }).click();
+      await page.getByRole("button", { name: "Featured event", exact: true }).click();
       await page.getByLabel("Title", { exact: true }).fill(title);
-      await page.locator('textarea[name="description"]').fill("Automated E2E test, not a real emergency.");
-      await page.getByRole("button", { name: "Create emergency" }).click();
-      await expect(page.getByText(/Emergency created/)).toBeVisible();
+      await page.locator('textarea[name="description"]').fill("Automated E2E test, not a real event.");
+      await page.getByRole("button", { name: "Create featured event" }).click();
+      await expect(page.getByText(/Featured event created/)).toBeVisible();
 
       const card = page.locator(".screen-card", { hasText: title });
       const tv = await context.newPage();

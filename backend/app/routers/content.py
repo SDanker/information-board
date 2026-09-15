@@ -6,10 +6,12 @@ import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import Response
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.audit import record as record_audit
+from app.branding import load_branding
 from app.config import get_settings
 from app.content_paths import safe_filename, source_prefix
 from app.database import get_db
@@ -17,7 +19,9 @@ from app.file_responses import storage_file_response
 from app.i18n import _
 from app.models import LIBRARY_VISIBILITIES, Asset, Content, ContentVersion, ProcessingJob, User, utc_now
 from app.realtime import publish_event
+from app.scheduling import current_minute, default_publication_window
 from app.schemas import AssetUpdate, ContentCreate, ContentResponse, ContentUpdate, ContentVersionResponse
+from app.schemas.content_schemas import PublicationWindow, check_publication_window
 from app.security import require_editor, require_operator
 from app.storage import StorageError, get_storage
 from app.uploads import UPLOAD_RULES, max_size_bytes
@@ -48,6 +52,53 @@ def _notify_content_changed(content_id: uuid.UUID | None = None, screen_event: s
     if screen_event and content_id:
         publish_event({"target": "all_screens", "type": screen_event, "content_id": str(content_id)})
     publish_event({"target": "admin", "type": "content_changed"})
+
+
+PUBLICATION_FIELDS = {"publish_start_at", "publish_end_at", "publish_days"}
+
+
+def _initial_publication(db: Session, provided: dict) -> dict:
+    """Publication period of new content: the values sent, completed with the defaults.
+
+    A missing start means now; a missing end means start + the default length from
+    Settings > Screens & TV (7 days unless changed; 0 = no end). An explicit null keeps that
+    side open, so API clients can still create content without limits.
+    """
+    start = provided["publish_start_at"] if "publish_start_at" in provided else current_minute()
+    if "publish_end_at" in provided:
+        end = provided["publish_end_at"]
+    else:
+        end = default_publication_window(load_branding(db).display.default_publication_days, start)[1]
+    try:
+        check_publication_window(start, end)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"publish_start_at": start, "publish_end_at": end, "publish_days": provided.get("publish_days")}
+
+
+def _form_publication(start: str | None, end: str | None, days: str | None) -> dict:
+    """Publication fields of a multipart upload: an absent field takes the default, empty text means no limit."""
+    raw: dict[str, object] = {}
+    if start is not None:
+        raw["publish_start_at"] = start.strip() or None
+    if end is not None:
+        raw["publish_end_at"] = end.strip() or None
+    if days is not None:
+        raw["publish_days"] = [part.strip() for part in days.split(",") if part.strip()] or None
+    try:
+        window = PublicationWindow.model_validate(raw)
+    except ValidationError as exc:
+        error = exc.errors()[0]
+        # Only the validators above raise translated messages ("value_error"); parsing errors
+        # carry internal English text, so they get a translated message naming the value instead.
+        if error["type"] == "value_error":
+            detail = str((error.get("ctx") or {}).get("error", error["msg"]))
+        elif error["loc"] and error["loc"][0] == "publish_days":
+            detail = _("Weekdays must be numbers between 0 (Monday) and 6 (Sunday)")
+        else:
+            detail = _("Invalid date and time: {value}", value=error.get("input"))
+        raise HTTPException(status_code=422, detail=detail)
+    return window.model_dump(include=set(raw))
 
 
 @router.get("/content", response_model=list[ContentResponse])
@@ -81,6 +132,7 @@ def create_content(
         library_visibility=payload.library_visibility,
         qr_overlay=payload.qr_overlay,
         created_by=user.id,
+        **_initial_publication(db, payload.model_dump(include=PUBLICATION_FIELDS, exclude_unset=True)),
     )
     db.add(content)
     db.flush()
@@ -105,12 +157,16 @@ def upload_content(
     title: Annotated[str, Form(min_length=2, max_length=200)],
     file: Annotated[UploadFile, File()],
     library_visibility: Annotated[str, Form()] = "LOCAL_PUBLIC",
+    publish_start_at: Annotated[str | None, Form()] = None,
+    publish_end_at: Annotated[str | None, Form()] = None,
+    publish_days: Annotated[str | None, Form(description="Comma-separated weekdays, 0=Monday")] = None,
 ) -> ContentResponse:
     rule = UPLOAD_RULES.get(kind)
     if rule is None:
         raise HTTPException(status_code=422, detail=_("Invalid content type for upload: {kind}", kind=kind))
     if library_visibility not in LIBRARY_VISIBILITIES:
         raise HTTPException(status_code=422, detail=_("Invalid visibility: {visibility}", visibility=library_visibility))
+    publication = _initial_publication(db, _form_publication(publish_start_at, publish_end_at, publish_days))
     original_name = file.filename or "file"
     if Path(original_name).suffix.lower() not in rule.extensions:
         raise HTTPException(
@@ -121,7 +177,7 @@ def upload_content(
     limit = max_size_bytes(get_settings(), rule)
     storage = get_storage()
 
-    content = Content(kind=kind, title=title, library_visibility=library_visibility, created_by=user.id)
+    content = Content(kind=kind, title=title, library_visibility=library_visibility, created_by=user.id, **publication)
     db.add(content)
     db.flush()
     version = ContentVersion(content_id=content.id, version_number=1, status="PENDING", payload={})
@@ -175,6 +231,12 @@ def update_content(
     updates = payload.model_dump(exclude_unset=True)
     for field, value in updates.items():
         setattr(content, field, value)
+    try:
+        # Checked on the merged values, because a PATCH may change only one side of the period.
+        check_publication_window(content.publish_start_at, content.publish_end_at)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc))
     db.commit()
     db.refresh(content)
     record_audit(db, user, "update", "content", str(content.id), {key: str(value) for key, value in updates.items()})

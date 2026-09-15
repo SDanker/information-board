@@ -1,10 +1,11 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.i18n import _
 from app.models import CONTENT_KINDS, LIBRARY_VISIBILITIES
+from app.scheduling import local_wall_time, publication_status
 
 
 class AssetResponse(BaseModel):
@@ -55,7 +56,49 @@ def _check_visibility(value: str | None) -> str | None:
     return value
 
 
-class ContentCreate(BaseModel):
+def normalize_weekdays(value: list[int] | None) -> list[int] | None:
+    """Weekdays 0 (Monday) .. 6 (Sunday). An empty list means every day and is stored as None."""
+    if not value:
+        return None
+    if any(day < 0 or day > 6 for day in value):
+        raise ValueError(_("Weekdays must be numbers between 0 (Monday) and 6 (Sunday)"))
+    return sorted(set(value))
+
+
+def normalize_wall_time(value: datetime | None) -> datetime | None:
+    """Periods are kept as local wall time to the minute; a value with a zone is converted first."""
+    return None if value is None else local_wall_time(value).replace(second=0, microsecond=0)
+
+
+def check_publication_window(start_at: datetime | None, end_at: datetime | None) -> None:
+    if start_at is not None and end_at is not None and end_at <= start_at:
+        raise ValueError(_("The publication must end after it starts"))
+
+
+class PublicationWindow(BaseModel):
+    """When content may be shown. On creation, omitted fields take the default period."""
+
+    publish_start_at: datetime | None = None
+    publish_end_at: datetime | None = None
+    publish_days: list[int] | None = None
+
+    @field_validator("publish_start_at", "publish_end_at")
+    @classmethod
+    def wall_time(cls, value: datetime | None) -> datetime | None:
+        return normalize_wall_time(value)
+
+    @field_validator("publish_days")
+    @classmethod
+    def weekdays(cls, value: list[int] | None) -> list[int] | None:
+        return normalize_weekdays(value)
+
+    @model_validator(mode="after")
+    def end_after_start(self) -> "PublicationWindow":
+        check_publication_window(self.publish_start_at, self.publish_end_at)
+        return self
+
+
+class ContentCreate(PublicationWindow):
     kind: str = Field(default="ANNOUNCEMENT")
     title: str = Field(min_length=2, max_length=200)
     library_visibility: str = Field(default="LOCAL_PUBLIC")
@@ -75,7 +118,7 @@ class ContentCreate(BaseModel):
         return _check_visibility(value)
 
 
-class ContentUpdate(BaseModel):
+class ContentUpdate(PublicationWindow):
     title: str | None = Field(default=None, min_length=2, max_length=200)
     library_visibility: str | None = None
     qr_overlay: dict | None = None
@@ -96,7 +139,19 @@ class ContentResponse(BaseModel):
     library_visibility: str
     qr_overlay: dict | None
     is_archived: bool
+    publish_start_at: datetime | None = None
+    publish_end_at: datetime | None = None
+    publish_days: list[int] | None = None
+    # Computed when the response is built: active, scheduled, expired or off_day.
+    publication_status: str = "active"
     created_at: datetime
     updated_at: datetime
     published_version: ContentVersionResponse | None = None
     latest_version: ContentVersionResponse | None = None
+
+    @model_validator(mode="after")
+    def current_publication_status(self) -> "ContentResponse":
+        self.publication_status = publication_status(
+            start_at=self.publish_start_at, end_at=self.publish_end_at, days=self.publish_days
+        )
+        return self

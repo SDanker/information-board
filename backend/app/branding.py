@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import SystemSetting
-from app.schemas.branding_schemas import BrandingResponse, BrandingSettings
+from app.schemas.branding_schemas import BrandingResponse, BrandingSettings, DisplaySettings
 
 logger = logging.getLogger("branding")
 
@@ -48,6 +48,10 @@ def default_branding() -> BrandingSettings:
             logger.warning("Ignoring invalid %s from the environment: %r", key.upper(), value)
             continue
         valid[key] = value
+    try:
+        valid["display"] = DisplaySettings(default_publication_days=settings.default_publication_days).model_dump()
+    except ValidationError:
+        logger.warning("Ignoring invalid DEFAULT_PUBLICATION_DAYS from the environment: %r", settings.default_publication_days)
     return BrandingSettings.model_validate(valid)
 
 

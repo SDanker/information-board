@@ -62,7 +62,7 @@ usuarios).
 
 Cada pantalla envía una señal de actividad cada 15 segundos; **Pantallas** muestra cuáles están en
 línea. Si se corta la red, la TV sigue mostrando el último contenido que tenía y se reconecta sola.
-Los cambios en playlists, marca, opciones de pantalla y emergencias llegan en tiempo real.
+Los cambios en playlists, marca, opciones de pantalla y actos destacados llegan en tiempo real.
 
 ## Respaldos
 
@@ -171,4 +171,4 @@ administración limitada a tus redes internas.
 | No acepta el inicio de sesión | Los valores `INITIAL_ADMIN_*` sólo aplican al primer arranque. Usa `python -m app.cli reset-password`. Demasiados intentos bloquean esa IP durante `LOGIN_WINDOW_SECONDS`. |
 | Los QR no abren en los teléfonos | Los QR usan la dirección con que se abrió la TV: abre la pantalla con la dirección o el nombre del servidor en la red, no `localhost` (o define un `PUBLIC_BASE_URL` fijo). El teléfono debe estar en una red que llegue al servidor. **Configuración → Sistema** avisa cuando la dirección es `localhost`. |
 | Hora incorrecta en TV o programación | Define la zona horaria en **Configuración → Marca** (y `TZ` en `.env` para los contenedores). |
-| No encuentra la dirección de una emergencia | Revisa `GEOCODING_ENABLED`, el acceso a Internet del servidor (o tu propio `GEOCODE_URL`) y `GEOCODE_COUNTRY_CODES`. |
+| No encuentra la dirección de un acto destacado | Revisa `GEOCODING_ENABLED`, el acceso a Internet del servidor (o tu propio `GEOCODE_URL`) y `GEOCODE_COUNTRY_CODES`. |

@@ -58,6 +58,10 @@ export const playlistMessages = defineMessages(
     "schedule.dateRange": "{start} → {end}",
     "schedule.fromDate": "From {date}",
     "schedule.untilDate": "Until {date}",
+    "schedule.publications": "Publication periods",
+    "schedule.publicationsHint": "Each publication is shown only inside its own period, whichever playlists include it. Change it with Edit in Content.",
+    "schedule.noPublications": "No publications yet.",
+    "schedule.everyDay": "Every day",
   },
   {
     "playlists.title": "Rotación por pantalla",
@@ -116,5 +120,9 @@ export const playlistMessages = defineMessages(
     "schedule.dateRange": "{start} → {end}",
     "schedule.fromDate": "Desde {date}",
     "schedule.untilDate": "Hasta {date}",
+    "schedule.publications": "Períodos de publicación",
+    "schedule.publicationsHint": "Cada publicación se muestra sólo dentro de su propio período, esté en las playlists que esté. Cámbialo con Editar en Publicaciones.",
+    "schedule.noPublications": "Todavía no hay publicaciones.",
+    "schedule.everyDay": "Todos los días",
   },
 );

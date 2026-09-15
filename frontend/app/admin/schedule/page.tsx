@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarClock, MonitorCheck, RefreshCw } from "lucide-react";
+import { CalendarClock, CalendarRange, MonitorCheck, RefreshCw } from "lucide-react";
 
 import AdminShell from "@/components/AdminShell";
-import { apiFetch, Playlist, PlaylistItem, Screen } from "@/lib/api";
+import { apiFetch, Content, Playlist, PlaylistItem, Screen } from "@/lib/api";
 import { useAuthReady } from "@/lib/auth";
 import { MessageKey, useI18n } from "@/lib/i18n";
+import { PUBLICATION_STATUS_KEYS, PUBLICATION_STATUS_ORDER, publicationPeriodLabel } from "@/lib/publication";
 
 const WEEK_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
@@ -20,9 +21,11 @@ function isAlwaysOn(item: PlaylistItem): boolean {
 
 export default function SchedulePage() {
   const ready = useAuthReady();
-  const { t, tp, formatDateTime } = useI18n();
+  const i18n = useI18n();
+  const { t, tp, formatDateTime } = i18n;
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [screens, setScreens] = useState<Screen[]>([]);
+  const [publications, setPublications] = useState<Content[]>([]);
   const [error, setError] = useState("");
   const [todayIndex, setTodayIndex] = useState<number | null>(null);
 
@@ -33,9 +36,15 @@ export default function SchedulePage() {
 
   async function load() {
     try {
-      const [playlistList, screenList] = await Promise.all([apiFetch<Playlist[]>("/playlists"), apiFetch<Screen[]>("/screens")]);
+      const [playlistList, screenList, contentList] = await Promise.all([
+        apiFetch<Playlist[]>("/playlists"),
+        apiFetch<Screen[]>("/screens"),
+        apiFetch<Content[]>("/content"),
+      ]);
       setPlaylists(playlistList);
       setScreens(screenList);
+      // Emergencies have no publication period: they are broadcast and stopped by hand.
+      setPublications(contentList.filter((item) => item.kind !== "EMERGENCY"));
       setError("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t("schedule.loadError"));
@@ -61,6 +70,12 @@ export default function SchedulePage() {
     if (item.end_date) return t("schedule.untilDate", { date: formatDate(item.end_date) });
     return null;
   }
+
+  const sortedPublications = [...publications].sort(
+    (a, b) =>
+      PUBLICATION_STATUS_ORDER[a.publication_status] - PUBLICATION_STATUS_ORDER[b.publication_status] ||
+      (a.publish_end_at ?? "9999").localeCompare(b.publish_end_at ?? "9999"),
+  );
 
   return (
     <AdminShell page="schedule" eyebrow={t("eyebrow.operation")}>
@@ -88,6 +103,31 @@ export default function SchedulePage() {
             );
           })}
         </div>
+      </section>
+
+      <section className="schedule-playlists">
+        <h3><CalendarRange size={18} /> {t("schedule.publications")}</h3>
+        <p className="empty-hint">{t("schedule.publicationsHint")}</p>
+        {sortedPublications.length === 0 ? (
+          <div className="empty-state"><p>{t("schedule.noPublications")}</p></div>
+        ) : (
+          <div className="schedule-card">
+            <ul className="publication-list">
+              {sortedPublications.map((item) => (
+                <li key={item.id} className={`publication-row status-${item.publication_status}`}>
+                  <strong>{item.title}</strong>
+                  <span>{publicationPeriodLabel(item, i18n)}</span>
+                  <span>
+                    {item.publish_days?.length
+                      ? item.publish_days.map((day) => t(`day.short.${day}` as MessageKey)).join(" · ")
+                      : t("schedule.everyDay")}
+                  </span>
+                  <em>{t(PUBLICATION_STATUS_KEYS[item.publication_status])}</em>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
 
       <section className="schedule-playlists">

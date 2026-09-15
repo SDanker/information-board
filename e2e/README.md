@@ -33,7 +33,7 @@ npm test
 - `document-flow.spec.ts`: uploads a `.txt` document, waits for the conversion, adds it to a
   playlist, assigns the playlist to a new screen and checks that the TV shows the page.
 - `spreadsheet-flow.spec.ts`: uploads a `.csv` and checks that the TV renders it as a table.
-- `emergency-flow.spec.ts`: creates an emergency, broadcasts it, checks that it interrupts a
+- `emergency-flow.spec.ts`: creates a featured event, broadcasts it, checks that it interrupts a
   TV in real time, stops it and checks that the TV goes back to normal.
 
 ---
@@ -71,5 +71,5 @@ npm test
 - `document-flow.spec.ts`: sube un documento `.txt`, espera la conversión, lo agrega a una
   playlist, la asigna a una pantalla nueva y verifica que la TV muestre la página.
 - `spreadsheet-flow.spec.ts`: sube un `.csv` y verifica que la TV lo muestre como tabla.
-- `emergency-flow.spec.ts`: crea una emergencia, la transmite, verifica que interrumpa una TV
+- `emergency-flow.spec.ts`: crea un acto destacado, lo transmite, verifica que interrumpa una TV
   en tiempo real, la detiene y verifica que la TV vuelva a la normalidad.

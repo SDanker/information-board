@@ -44,12 +44,30 @@ idiomas; deja el campo vacío para usar el nombre por defecto traducido.
 | --- | --- | --- |
 | Segundos por defecto de cada elemento | 15 | Se usa cuando un elemento no tiene duración propia. |
 | Segundos mínimos por página o diapositiva | 4 | Los documentos y presentaciones de varias páginas siguen en pantalla hasta mostrar todas. Cada página puede tener su propia duración. |
-| Segundos por foto o mapa de emergencia | 7 | Los videos de emergencia siempre se reproducen completos. |
+| Segundos por foto o mapa de acto destacado | 7 | Los videos de los actos destacados siempre se reproducen completos. |
 | Filas por página en planillas | 14 | Las tablas grandes se dividen en varias páginas. |
+| Duración por defecto de una publicación (días) | 7 | Las publicaciones nuevas comienzan al crearlas y terminan después de esta cantidad de días. 0 = sin término. Valor inicial: `DEFAULT_PUBLICATION_DAYS`. |
 | Mostrar el reloj / reloj de 24 horas | sí / sí | |
-| Mostrar el mapa en emergencias | sí | |
+| Mostrar el mapa en actos destacados | sí | |
 | Texto del pie en la TV | vacío | Reemplaza la ruta de la pantalla abajo a la izquierda. |
 | Código QR: mostrar, posición, mensaje | sí, abajo a la derecha | El QR abre `/catalog/<slug>` con todos los elementos de la playlist de la pantalla. |
+
+### Período de publicación
+
+Cada publicación, excepto los actos destacados (que se transmiten y detienen a mano), tiene un
+período que se define al crearla y se puede cambiar después con **Editar**:
+
+- **Inicio / Término**: fecha y hora en la zona horaria de la instalación. Inicio vacío = de
+  inmediato; término vacío = sin fecha de término. Las publicaciones nuevas vienen con
+  *ahora* → *ahora + duración por defecto*, y hay botones rápidos de 1, 7, 14 o 30 días.
+- **Días**: opcionalmente, mostrarla sólo algunos días de la semana dentro del período (sin
+  selección = todos los días).
+
+Fuera de su período la publicación no se muestra en ninguna pantalla, esté en las playlists que
+esté, y desaparece de los catálogos de pantalla, la biblioteca pública y los enlaces compartidos.
+Los elementos de una playlist pueden sumar sus propias fechas, días y horas. **Programación**
+lista todas las publicaciones con su período y estado (publicada, programada, hoy no, vencida).
+Las publicaciones creadas antes de esta opción no tienen límites.
 
 ### Selector de idioma
 
@@ -123,7 +141,7 @@ requiere cambiarla también dentro de PostgreSQL (`ALTER USER ... PASSWORD ...`)
 | Variable | Por defecto | Descripción |
 | --- | --- | --- |
 | `MAX_DOCUMENT_SIZE_MB` | `100` | Documentos, planillas y presentaciones. |
-| `MAX_IMAGE_SIZE_MB` | `25` | Imágenes, incluidas las fotos de emergencia. |
+| `MAX_IMAGE_SIZE_MB` | `25` | Imágenes, incluidas las fotos de actos destacados. |
 | `MAX_VIDEO_SIZE_MB` | `500` | Videos. |
 | `MAX_LOGO_SIZE_MB` | `5` | Logo en Configuración. |
 | `NGINX_MAX_BODY_SIZE` | `600m` | Tamaño máximo de petición que acepta nginx; mantenlo sobre el límite más grande. |
@@ -133,11 +151,11 @@ requiere cambiarla también dentro de PostgreSQL (`ALTER USER ... PASSWORD ...`)
 `STORAGE_BACKEND` (`local` o `s3`), `BOARD_DATA_PATH`, `BOARD_BACKUPS_PATH`, `APP_UID`, `APP_GID`,
 `BACKUP_KEEP` y las variables `NAS_*` y `S3_*` se explican en [almacenamiento.md](almacenamiento.md).
 
-### Geocodificación de emergencias
+### Geocodificación de actos destacados
 
 | Variable | Por defecto | Descripción |
 | --- | --- | --- |
-| `GEOCODING_ENABLED` | `true` | Activa o desactiva la búsqueda de direcciones. Sin ella las emergencias funcionan igual, pero sin mapa. |
+| `GEOCODING_ENABLED` | `true` | Activa o desactiva la búsqueda de direcciones. Sin ella los actos destacados funcionan igual, pero sin mapa. |
 | `GEOCODE_URL` | Nominatim de OpenStreetMap | Cualquier endpoint `/search` compatible con Nominatim, p. ej. una instancia propia para redes sin Internet. |
 | `GEOCODE_COUNTRY_CODES` | vacío | Códigos ISO de país que restringen resultados, p. ej. `cl` o `us,ca`. Vacío = todo el mundo. |
 | `GEOCODE_USER_AGENT` | vacío | Identifica tu instalación (lo pide la política de uso de OpenStreetMap), p. ej. `information-board (ti@ejemplo.cl)`. |

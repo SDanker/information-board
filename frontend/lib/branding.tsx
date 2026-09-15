@@ -21,6 +21,7 @@ export type DisplaySettings = {
   qr_position: QrPosition;
   qr_message: string;
   show_emergency_map: boolean;
+  default_publication_days: number;
 };
 
 export type Branding = {
@@ -51,6 +52,7 @@ export const DEFAULT_DISPLAY: DisplaySettings = {
   qr_position: "bottom-right",
   qr_message: "",
   show_emergency_map: true,
+  default_publication_days: 7,
 };
 
 type BrandingContextValue = {

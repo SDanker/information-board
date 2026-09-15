@@ -10,7 +10,7 @@ from app.database import get_db
 from app.i18n import _
 from app.models import Content, ContentVersion, Playlist, PlaylistItem, Screen, User
 from app.realtime import publish_event
-from app.scheduling import is_item_scheduled_now
+from app.scheduling import is_item_scheduled_now, is_published_now
 from app.schemas import (
     PlaylistCreate,
     PlaylistItemCreate,
@@ -71,7 +71,7 @@ def _response(db: Session, playlist: Playlist) -> PlaylistResponse:
             days_of_week=item.days_of_week,
             start_time=item.start_time,
             end_time=item.end_time,
-        )
+        ) and (item.content is None or is_published_now(item.content))
         items.append(item_payload)
     payload.items = items
     return payload

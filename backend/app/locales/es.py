@@ -53,6 +53,10 @@ MESSAGES: dict[str, str] = {
     "There is no processing job for this version": "No hay un trabajo de conversión asociado a esta versión",
     "File not found": "Archivo no encontrado",
     "Only pages of a document or presentation accept a custom duration": "Sólo las páginas de un documento o presentación admiten una duración personalizada",
+    # Publication periods
+    "The publication must end after it starts": "La publicación debe terminar después de su inicio",
+    "Weekdays must be numbers between 0 (Monday) and 6 (Sunday)": "Los días deben ser números entre 0 (lunes) y 6 (domingo)",
+    "Invalid date and time: {value}": "Fecha y hora no válidas: {value}",
     # Playlists
     "Playlist not found": "Playlist no encontrada",
     "Item not found": "Elemento no encontrado",
@@ -66,8 +70,8 @@ MESSAGES: dict[str, str] = {
     "Nothing to download yet": "Nada para descargar todavía",
     "The public library is disabled": "La biblioteca pública está desactivada",
     # Emergencies
-    "Emergency not found": "Emergencia no encontrada",
-    "The emergency has no published version": "La emergencia no tiene una versión publicada",
+    "Featured event not found": "Acto destacado no encontrado",
+    "The featured event has no published version": "El acto destacado no tiene una versión publicada",
     "Photo extension not allowed: {extension}": "Extensión de foto no admitida: {extension}",
     "Photo is too large: {name}": "Foto demasiado grande: {name}",
     "Video extension not allowed: {extension}": "Extensión de video no admitida: {extension}",

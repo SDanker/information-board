@@ -15,7 +15,7 @@ from app.database import get_db
 from app.i18n import _
 from app.models import ACTIVE_EMERGENCY_KEY, Content, ContentVersion, Playlist, PlaylistItem, Screen, SystemSetting, User
 from app.network import client_ip, public_base_url, url_version
-from app.scheduling import is_item_scheduled_now
+from app.scheduling import is_item_scheduled_now, is_published_now
 from app.schemas import HeartbeatRequest, LibraryItem, ScreenCreate, ScreenLibraryResponse, ScreenResponse, ScreenUpdate
 from app.schemas.branding_schemas import DisplaySettings
 from app.schemas.playlist_schemas import PlaylistPlaybackItem, PlaylistPlaybackResponse
@@ -159,6 +159,9 @@ def public_screen_playlist(slug: str, request: Request, db: Annotated[Session, D
         content = item.content
         if content is None or content.deleted_at is not None or content.published_version is None:
             continue
+        # The publication period applies to the content itself, whichever playlists include it.
+        if not is_published_now(content):
+            continue
         if not is_item_scheduled_now(
             is_active=item.is_active,
             start_date=item.start_date,
@@ -270,7 +273,7 @@ def public_screen_library(slug: str, request: Request, db: Annotated[Session, De
         content = item.content
         if content is None or content.id in seen or content.deleted_at is not None or content.is_archived:
             continue
-        if content.library_visibility == "PRIVATE" or content.published_version is None:
+        if content.library_visibility == "PRIVATE" or content.published_version is None or not is_published_now(content):
             continue
         seen.add(content.id)
         token = get_or_create_token(db, content)

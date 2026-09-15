@@ -35,13 +35,13 @@ def _load(db: Session, content_id: uuid.UUID) -> Content:
         .options(selectinload(Content.versions).selectinload(ContentVersion.assets), selectinload(Content.published_version))
     )
     if content is None:
-        raise HTTPException(status_code=404, detail=_("Emergency not found"))
+        raise HTTPException(status_code=404, detail=_("Featured event not found"))
     return content
 
 
 def _published_version_or_404(content: Content) -> ContentVersion:
     if content.published_version is None:
-        raise HTTPException(status_code=404, detail=_("The emergency has no published version"))
+        raise HTTPException(status_code=404, detail=_("The featured event has no published version"))
     return content.published_version
 
 
@@ -102,7 +102,7 @@ def update_location(
     content = _load(db, content_id)
     version = content.published_version or max(content.versions, key=lambda v: v.version_number, default=None)
     if version is None:
-        raise HTTPException(status_code=404, detail=_("The emergency has no published version"))
+        raise HTTPException(status_code=404, detail=_("The featured event has no published version"))
     version.payload = {**version.payload, "latitude": payload.latitude, "longitude": payload.longitude, "geocode_provider": "manual"}
     db.commit()
     publish_event({"target": "all_screens", "type": "content_updated", "content_id": str(content.id)})

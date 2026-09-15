@@ -43,6 +43,8 @@ export type ContentVersion = {
   assets: Asset[];
 };
 
+export type PublicationStatus = "active" | "scheduled" | "expired" | "off_day";
+
 export type Content = {
   id: string;
   kind: ContentKind;
@@ -52,6 +54,12 @@ export type Content = {
   is_archived: boolean;
   created_at: string;
   updated_at: string;
+  /** Installation's local wall time ("YYYY-MM-DDTHH:MM:SS"); null = no limit on that side. */
+  publish_start_at: string | null;
+  publish_end_at: string | null;
+  /** 0 = Monday .. 6 = Sunday; null = every day. */
+  publish_days: number[] | null;
+  publication_status: PublicationStatus;
   published_version: ContentVersion | null;
   latest_version: ContentVersion | null;
 };

@@ -31,6 +31,13 @@ class Content(Base):
         nullable=True,
     )
     created_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    # Publication period in the installation's local wall time (TZ), like playlist schedules.
+    # Outside it the content is not shown on screens, in catalogs or through share links,
+    # whichever playlists it belongs to. None on either side = open-ended.
+    publish_start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
+    publish_end_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
+    # Weekdays (0=Monday .. 6=Sunday) inside the period; None = every day.
+    publish_days: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

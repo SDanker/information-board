@@ -2,7 +2,7 @@
 
 **English** · [Español](es/almacenamiento.md)
 
-Uploaded originals, converted pages, video renditions, emergency media and the logo can be stored
+Uploaded originals, converted pages, video renditions, featured event media and the logo can be stored
 in four ways. The database always stays in the `postgres_data` Docker volume.
 
 | Option | Best for | Settings |

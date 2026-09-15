@@ -163,6 +163,7 @@ SECTIONS: list[tuple[str, list[str]]] = [
     ("First administrator and screens (only used while the database is empty)", ["INITIAL_ADMIN_USERNAME", "INITIAL_ADMIN_PASSWORD", "INITIAL_SCREENS"]),
     ("Security", ["APP_ENV", "SECRET_KEY", "ACCESS_TOKEN_MINUTES", "LOGIN_MAX_ATTEMPTS", "LOGIN_WINDOW_SECONDS"]),
     ("Database and cache", ["POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD", "DATABASE_URL", "REDIS_URL"]),
+    ("Publications (default length in days, editable later in Settings)", ["DEFAULT_PUBLICATION_DAYS"]),
     ("Uploads", ["MAX_DOCUMENT_SIZE_MB", "MAX_IMAGE_SIZE_MB", "MAX_VIDEO_SIZE_MB", "MAX_LOGO_SIZE_MB", "NGINX_MAX_BODY_SIZE"]),
     (
         "File storage (docs/storage.md)",
@@ -174,7 +175,7 @@ SECTIONS: list[tuple[str, list[str]]] = [
             "S3_FORCE_PATH_STYLE", "S3_SERVE_MODE", "S3_PRESIGN_SECONDS",
         ],
     ),
-    ("Emergency geocoding", ["GEOCODING_ENABLED", "GEOCODE_URL", "GEOCODE_COUNTRY_CODES", "GEOCODE_USER_AGENT"]),
+    ("Featured event geocoding", ["GEOCODING_ENABLED", "GEOCODE_URL", "GEOCODE_COUNTRY_CODES", "GEOCODE_USER_AGENT"]),
 ]
 # Written only when they have a value: an empty COMPOSE_FILE would confuse Docker Compose.
 OMIT_WHEN_EMPTY = {"COMPOSE_PATH_SEPARATOR", "COMPOSE_FILE"}
@@ -245,6 +246,7 @@ def base_values() -> dict[str, str]:
         "POSTGRES_PASSWORD": database_password,
         "DATABASE_URL": f"postgresql+psycopg://information_board:{database_password}@postgres:5432/information_board",
         "REDIS_URL": "redis://redis:6379/0",
+        "DEFAULT_PUBLICATION_DAYS": "7",
         "MAX_DOCUMENT_SIZE_MB": "100",
         "MAX_IMAGE_SIZE_MB": "25",
         "MAX_VIDEO_SIZE_MB": "500",

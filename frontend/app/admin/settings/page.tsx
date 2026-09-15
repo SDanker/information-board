@@ -2,7 +2,7 @@
 
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import {
-  Activity, Check, Clock3, Database, Globe, HardDrive, ImagePlus, KeyRound, LayoutList,
+  Activity, CalendarClock, Check, Clock3, Database, Globe, HardDrive, ImagePlus, KeyRound, LayoutList,
   Monitor, Palette, QrCode, RefreshCw, RotateCcw, Server, Trash2, User, X,
 } from "lucide-react";
 
@@ -15,7 +15,7 @@ import { MessageKey, useI18n } from "@/lib/i18n";
 import { isLanguage, LANGUAGES } from "@/lib/i18n/core";
 
 type Tab = "branding" | "pages" | "display" | "system" | "account";
-type NumberSetting = "default_item_seconds" | "min_page_seconds" | "emergency_pane_seconds" | "spreadsheet_rows_per_page";
+type NumberSetting = "default_item_seconds" | "min_page_seconds" | "emergency_pane_seconds" | "spreadsheet_rows_per_page" | "default_publication_days";
 type ToggleSetting = "show_clock" | "clock_24h" | "show_qr" | "show_emergency_map";
 
 const TABS: { id: Tab; icon: typeof Palette; label: MessageKey }[] = [
@@ -361,6 +361,11 @@ export default function SettingsPage() {
                 {numberField("min_page_seconds", "settings.minPageSeconds", 2, 120)}
                 {numberField("emergency_pane_seconds", "settings.emergencyPaneSeconds", 3, 120)}
                 {numberField("spreadsheet_rows_per_page", "settings.rowsPerPage", 5, 40)}
+              </section>
+              <section className="settings-card">
+                <h3><CalendarClock size={17} /> {t("settings.publications")}</h3>
+                {numberField("default_publication_days", "settings.defaultPublicationDays", 0, 3650)}
+                <p className="settings-help">{t("settings.defaultPublicationDaysHint")}</p>
               </section>
               <section className="settings-card">
                 <h3><Monitor size={17} /> {t("settings.tvElements")}</h3>
