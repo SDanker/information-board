@@ -38,6 +38,8 @@ class LibraryItem(BaseModel):
     title: str
     thumbnail_url: str | None
     share_url: str
+    # When the publication period ended (local wall time); set on archived items.
+    period_end: datetime | None = None
 
 
 class ScreenLibraryResponse(BaseModel):

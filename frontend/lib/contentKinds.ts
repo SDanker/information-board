@@ -1,4 +1,4 @@
-import { AlertTriangle, FileText, Film, Image as ImageIcon, Presentation, Table } from "lucide-react";
+import { AlertTriangle, CalendarDays, FileText, Film, Image as ImageIcon, Presentation, Table } from "lucide-react";
 
 import type { ContentKind } from "./api";
 
@@ -10,6 +10,7 @@ export const KIND_ICONS: Record<ContentKind, typeof FileText> = {
   EXCEL: Table,
   PPTX: Presentation,
   EMERGENCY: AlertTriangle,
+  CALENDAR: CalendarDays,
 };
 
 /** The API returns absolute share URLs (the visitor's address, or PUBLIC_BASE_URL when it is

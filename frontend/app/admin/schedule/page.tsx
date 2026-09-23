@@ -7,7 +7,7 @@ import AdminShell from "@/components/AdminShell";
 import { apiFetch, Content, Playlist, PlaylistItem, Screen } from "@/lib/api";
 import { useAuthReady } from "@/lib/auth";
 import { MessageKey, useI18n } from "@/lib/i18n";
-import { PUBLICATION_STATUS_KEYS, PUBLICATION_STATUS_ORDER, publicationPeriodLabel } from "@/lib/publication";
+import { isArchivedContent, PUBLICATION_STATUS_KEYS, PUBLICATION_STATUS_ORDER, publicationPeriodLabel } from "@/lib/publication";
 
 const WEEK_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
@@ -43,8 +43,8 @@ export default function SchedulePage() {
       ]);
       setPlaylists(playlistList);
       setScreens(screenList);
-      // Emergencies have no publication period: they are broadcast and stopped by hand.
-      setPublications(contentList.filter((item) => item.kind !== "EMERGENCY"));
+      // Archived publications have left the schedule: they are listed in Content > Archived.
+      setPublications(contentList.filter((item) => !isArchivedContent(item)));
       setError("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t("schedule.loadError"));

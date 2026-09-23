@@ -44,16 +44,43 @@ default name.
 | Minimum seconds per page or slide | 4 | Multi-page documents and presentations stay on screen until every page has been shown. Individual pages can have their own duration. |
 | Seconds per featured event photo or map | 7 | Featured event videos always play to the end. |
 | Spreadsheet rows per page | 14 | Large tables are split into several pages. |
+| Default calendar address (ICS) | empty | Pre-filled when creating a Calendar publication, so each installation points at its own calendar. Initial value: `DEFAULT_CALENDAR_ICS_URL`. |
 | Default publication length (days) | 7 | New publications start when they are created and end after this many days. 0 = no end date. Initial value: `DEFAULT_PUBLICATION_DAYS`. |
 | Show the clock / 24-hour clock | on / on | |
 | Show the map during featured events | on | |
 | TV footer text | empty | Replaces the screen path shown at the bottom left. |
 | QR code: show, position, message | on, bottom right | The QR opens `/catalog/<slug>` with every item in the screen's playlist. |
 
+### Shared calendars
+
+A **Calendar** publication shows a shared calendar on the screens as a month, week or day view:
+
+1. Publish the calendar in your provider and copy the address ending in `.ics`:
+   - **Outlook / Microsoft 365**: Calendar → Settings → Shared calendars → Publish a calendar.
+     Choose "Can view all details" to show event titles, then copy the **ICS** link (the HTML
+     link is Outlook's own web page and cannot be drawn by the board).
+   - **Google Calendar**: Settings → the calendar → "Secret address in iCal format".
+   - **Nextcloud**: Calendar → Share → publish, then the subscription (ICS) link.
+2. In **Content → New publication → Calendar**, paste the address, pick the view and use
+   **Test link** to confirm it can be read. To have it ready every time, store it in
+   `DEFAULT_CALENDAR_ICS_URL` or in **Settings → Screens & TV → Publications**.
+3. Add the publication to a playlist like any other.
+
+A calendar never shows the screen QR code and is left out of the screen catalog and the public
+library: it is read live from its source, so there is nothing to download, and the code would
+only cover part of the grid. Any other publication can hide the code on its own with **Show the
+QR code while this is on screen** in its form.
+
+The server downloads the feed, expands repeating events and converts every time to the
+installation's time zone, so the TVs need no Internet access and the address stays out of the
+page. The result is cached for 10 minutes, and kept up to a week: if the provider is
+unreachable the screens keep showing the last known events. Anyone with the ICS link can read
+the calendar, so treat it as a password and use **Test link** rather than opening it in public.
+
 ### Publication period
 
-Every publication except featured events (which are broadcast and stopped by hand) has a period,
-set when it is created and editable later with **Edit**:
+Every publication, featured events included, has a period, set when it is created and editable
+later with **Edit**:
 
 - **Starts / Ends**: date and time in the installation's time zone. Empty start = immediately;
   empty end = no end date. New publications are pre-filled with *now* → *now + default length*,
@@ -63,8 +90,29 @@ set when it is created and editable later with **Edit**:
 Outside its period a publication is not shown on any screen, whichever playlists include it, and
 it disappears from screen catalogs, the public library and share links. Playlist items can still
 add their own dates, days and hours on top. **Schedule** lists every publication with its period
-and status (published, scheduled, not today, expired). Publications created before this option
-existed have no limits.
+and status (published, scheduled, not today). Publications created before this option existed have
+no limits, so nothing that was already on screen disappears.
+
+A featured event that is being broadcast stays on every screen until you stop the broadcast,
+whatever its period.
+
+### Archived publications
+
+When a publication reaches its end date and time it is **archived** within a minute:
+
+- It leaves every playlist and stops appearing on screens and in the screen catalogs.
+- It moves to the **Archived** segment of **Content**, with a counter on the tab.
+- It appears in the **Archived** segment of the download pages (`/library` and the page a screen's
+  QR code opens). Each item can still be downloaded, and **Download all (.zip)** bundles every
+  archived publication, one folder each. Only publications that are *public on the local network*
+  are listed, and the segment follows the public library switch.
+- Existing links and QR codes to it keep delivering the file.
+
+**Restore** (in the Archived segment) publishes it again from now with the default period, keeping
+the weekdays it had. Restoring does not put it back into playlists, because archiving removed it
+from them: add it again from **Playlists** and adjust the period with **Edit**. Archiving by hand
+from the API (`is_archived`) behaves the same way. Calendars are archived too, but have nothing to
+download.
 
 ### Language picker
 

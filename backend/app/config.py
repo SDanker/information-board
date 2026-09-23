@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     initial_screens: str = ""
     # Initial default publication length of new content in days (0 = no end date).
     default_publication_days: int = 7
+    # Calendar (ICS) address pre-filled when creating a Calendar publication.
+    default_calendar_ics_url: str = ""
 
     # Security.
     allowed_networks: str = ""

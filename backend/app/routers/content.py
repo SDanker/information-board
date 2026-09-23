@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.archiving import notify_archived, remove_from_playlists, restore_content
 from app.audit import record as record_audit
 from app.branding import load_branding
 from app.config import get_settings
@@ -19,7 +20,7 @@ from app.file_responses import storage_file_response
 from app.i18n import _
 from app.models import LIBRARY_VISIBILITIES, Asset, Content, ContentVersion, ProcessingJob, User, utc_now
 from app.realtime import publish_event
-from app.scheduling import current_minute, default_publication_window
+from app.publication import PUBLICATION_FIELDS, initial_publication as _initial_publication
 from app.schemas import AssetUpdate, ContentCreate, ContentResponse, ContentUpdate, ContentVersionResponse
 from app.schemas.content_schemas import PublicationWindow, check_publication_window
 from app.security import require_editor, require_operator
@@ -54,26 +55,19 @@ def _notify_content_changed(content_id: uuid.UUID | None = None, screen_event: s
     publish_event({"target": "admin", "type": "content_changed"})
 
 
-PUBLICATION_FIELDS = {"publish_start_at", "publish_end_at", "publish_days"}
+# Kinds published right away, with no file to convert.
+DIRECT_KINDS = ("ANNOUNCEMENT", "CALENDAR")
 
 
-def _initial_publication(db: Session, provided: dict) -> dict:
-    """Publication period of new content: the values sent, completed with the defaults.
-
-    A missing start means now; a missing end means start + the default length from
-    Settings > Screens & TV (7 days unless changed; 0 = no end). An explicit null keeps that
-    side open, so API clients can still create content without limits.
-    """
-    start = provided["publish_start_at"] if "publish_start_at" in provided else current_minute()
-    if "publish_end_at" in provided:
-        end = provided["publish_end_at"]
-    else:
-        end = default_publication_window(load_branding(db).display.default_publication_days, start)[1]
-    try:
-        check_publication_window(start, end)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    return {"publish_start_at": start, "publish_end_at": end, "publish_days": provided.get("publish_days")}
+def _direct_payload(payload: ContentCreate, kind: str) -> dict:
+    """Stored version payload of a kind that needs no conversion pipeline."""
+    if kind == "CALENDAR":
+        if payload.calendar is None:
+            raise HTTPException(status_code=422, detail=_("Calendars require the 'calendar' field"))
+        return payload.calendar.model_dump()
+    if payload.announcement is None:
+        raise HTTPException(status_code=422, detail=_("Announcements require the 'announcement' field"))
+    return payload.announcement.model_dump()
 
 
 def _form_publication(start: str | None, end: str | None, days: str | None) -> dict:
@@ -122,10 +116,9 @@ def list_content(
 def create_content(
     payload: ContentCreate, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(require_editor)]
 ) -> ContentResponse:
-    if payload.kind != "ANNOUNCEMENT":
+    if payload.kind not in DIRECT_KINDS:
         raise HTTPException(status_code=422, detail=_("Content of type {kind} cannot be created from this endpoint", kind=payload.kind))
-    if payload.announcement is None:
-        raise HTTPException(status_code=422, detail=_("Announcements require the 'announcement' field"))
+    version_payload = _direct_payload(payload, payload.kind)
     content = Content(
         kind=payload.kind,
         title=payload.title,
@@ -137,7 +130,7 @@ def create_content(
     db.add(content)
     db.flush()
     version = ContentVersion(
-        content_id=content.id, version_number=1, status="READY", payload=payload.announcement.model_dump(), published_at=utc_now()
+        content_id=content.id, version_number=1, status="READY", payload=version_payload, published_at=utc_now()
     )
     db.add(version)
     db.flush()
@@ -237,9 +230,30 @@ def update_content(
     except ValueError as exc:
         db.rollback()
         raise HTTPException(status_code=422, detail=str(exc))
+    # Archiving by hand behaves like archiving by expiry: the publication leaves every playlist.
+    playlists_changed = remove_from_playlists(db, content.id) if updates.get("is_archived") is True else set()
     db.commit()
     db.refresh(content)
     record_audit(db, user, "update", "content", str(content.id), {key: str(value) for key, value in updates.items()})
+    _notify_content_changed(content.id, "content_updated")
+    if playlists_changed:
+        notify_archived(playlists_changed)
+    return _response(_get_or_404(db, content.id))
+
+
+@router.post("/content/{content_id}/restore", response_model=ContentResponse)
+def restore_archived(
+    content_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(require_editor)]
+) -> ContentResponse:
+    """Bring an archived publication back with a new period: from now, for the default length.
+
+    It returns to the Published list but not to any playlist, because archiving removed it from them.
+    """
+    content = _get_or_404(db, content_id)
+    restore_content(db, content, load_branding(db).display.default_publication_days)
+    db.commit()
+    db.refresh(content)
+    record_audit(db, user, "restore", "content", str(content.id), {"title": content.title})
     _notify_content_changed(content.id, "content_updated")
     return _response(_get_or_404(db, content.id))
 
@@ -251,15 +265,14 @@ def create_version(
     db: Annotated[Session, Depends(get_db)],
     _editor: Annotated[User, Depends(require_editor)],
 ) -> ContentResponse:
-    """Publish a new version of an existing announcement (text or background edit)."""
+    """Publish a new version of an announcement (text or background) or of a calendar."""
     content = _get_or_404(db, content_id)
-    if content.kind != "ANNOUNCEMENT":
-        raise HTTPException(status_code=422, detail=_("Only announcements accept new versions through this endpoint"))
-    if payload.announcement is None:
-        raise HTTPException(status_code=422, detail=_("Announcements require the 'announcement' field"))
+    if content.kind not in DIRECT_KINDS:
+        raise HTTPException(status_code=422, detail=_("Only announcements and calendars accept new versions through this endpoint"))
+    version_payload = _direct_payload(payload, content.kind)
     next_number = max((v.version_number for v in content.versions), default=0) + 1
     version = ContentVersion(
-        content_id=content.id, version_number=next_number, status="READY", payload=payload.announcement.model_dump(), published_at=utc_now()
+        content_id=content.id, version_number=next_number, status="READY", payload=version_payload, published_at=utc_now()
     )
     db.add(version)
     db.flush()

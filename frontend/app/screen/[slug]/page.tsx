@@ -1,13 +1,13 @@
 "use client";
 
 import { use, useEffect, useRef, useState } from "react";
-import { Activity, Clock3, Radio, WifiOff } from "lucide-react";
+import { Activity, CalendarDays, Clock3, MapPin, Radio, WifiOff } from "lucide-react";
 
 import BrandMark from "@/components/BrandMark";
-import { API_BASE, wsUrl } from "@/lib/api";
+import { API_BASE, CalendarEvent, CalendarFeed, wsUrl } from "@/lib/api";
 import { DisplaySettings, useBranding, useDisplaySettings } from "@/lib/branding";
-import { HEARTBEAT_INTERVAL_MS, PLAYLIST_POLL_INTERVAL_MS, STORAGE_KEYS } from "@/lib/constants";
-import { useI18n } from "@/lib/i18n";
+import { CALENDAR_POLL_INTERVAL_MS, HEARTBEAT_INTERVAL_MS, PLAYLIST_POLL_INTERVAL_MS, STORAGE_KEYS } from "@/lib/constants";
+import { MessageKey, useI18n } from "@/lib/i18n";
 
 type ScreenInfo = { name: string; slug: string; description: string };
 
@@ -306,6 +306,156 @@ function EmergencySlide({ item }: { item: PlaybackItem }) {
   );
 }
 
+/** Days of [start, end) as "YYYY-MM-DD". The values are already local dates, so the maths
+ * is done in UTC to avoid the browser shifting them by its own time zone. */
+function eachDay(start: string, end: string): string[] {
+  const days: string[] = [];
+  const cursor = new Date(`${start}T00:00:00Z`);
+  while (cursor.toISOString().slice(0, 10) < end) {
+    days.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return days;
+}
+
+/** Last day an event is visible on: the ICS end of an all-day entry is the next midnight. */
+function lastDayOf(event: CalendarEvent): string {
+  const end = event.end.slice(0, 10);
+  if (!event.all_day || end <= event.start.slice(0, 10)) return end;
+  const previous = new Date(`${end}T00:00:00Z`);
+  previous.setUTCDate(previous.getUTCDate() - 1);
+  return previous.toISOString().slice(0, 10);
+}
+
+/** Shared calendar (ICS). The backend downloads and expands the feed, so this only draws it
+ * and keeps a copy: a TV without Internet access still shows the last known events. */
+function CalendarSlide({ item }: { item: PlaybackItem }) {
+  const { t, formatDateTime } = useI18n();
+  const display = useDisplaySettings();
+  const [feed, setFeed] = useState<CalendarFeed | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setFeed(readCache<CalendarFeed>(STORAGE_KEYS.calendarCache(item.content_id)));
+    async function load() {
+      try {
+        const response = await fetchWithTimeout(`${API_BASE}/public/calendar/${item.content_id}`);
+        if (!response.ok) {
+          if (active) setFailed(true);
+          return;
+        }
+        const data: CalendarFeed = await response.json();
+        if (!active) return;
+        setFeed(data);
+        setFailed(false);
+        writeCache(STORAGE_KEYS.calendarCache(item.content_id), data);
+      } catch {
+        // Offline: the cached copy stays on screen until the next attempt.
+      }
+    }
+    load();
+    const timer = setInterval(load, CALENDAR_POLL_INTERVAL_MS);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [item.content_id]);
+
+  if (!feed) {
+    return <PlaceholderSlide title={item.title} text={t(failed ? "board.calendarUnavailable" : "board.calendarLoading")} onAir />;
+  }
+
+  // Local wall time formatted as UTC, so the clock shown is the one the calendar reported.
+  const asUtc = (value: string) => `${value.length > 10 ? value : `${value}T00:00`}:00Z`;
+  const dateLabel = (day: string, options: Intl.DateTimeFormatOptions) => formatDateTime(asUtc(day), { ...options, timeZone: "UTC" });
+  const timeLabel = (event: CalendarEvent) =>
+    event.all_day
+      ? t("board.allDay")
+      : formatDateTime(asUtc(event.start), { hour: "2-digit", minute: "2-digit", hour12: !display.clock_24h, timeZone: "UTC" });
+  // "20:00 - 22:30", or the end date too when the event crosses midnight.
+  const rangeLabel = (event: CalendarEvent) => {
+    if (event.all_day) return t("board.allDay");
+    const ends = formatDateTime(asUtc(event.end), { hour: "2-digit", minute: "2-digit", hour12: !display.clock_24h, timeZone: "UTC" });
+    const sameDay = event.end.slice(0, 10) === event.start.slice(0, 10);
+    return sameDay ? `${timeLabel(event)} – ${ends}` : `${timeLabel(event)} – ${dateLabel(event.end, { day: "numeric", month: "short" })} ${ends}`;
+  };
+  const eventsOn = (day: string) => feed.events.filter((event) => event.start.slice(0, 10) <= day && lastDayOf(event) >= day);
+  const days = eachDay(feed.range_start, feed.range_end);
+  // A week with a couple of events per day has room for times and places; a busy one does not.
+  const busiestDay = days.reduce((most, day) => Math.max(most, eventsOn(day).length), 0);
+  const density = busiestDay <= 2 ? "roomy" : busiestDay <= 4 ? "normal" : "tight";
+  const perDay = feed.view === "month" ? 3 : density === "roomy" ? 4 : density === "normal" ? 6 : 10;
+  const periodLabel =
+    feed.view === "month"
+      ? dateLabel(feed.period_start, { month: "long", year: "numeric" })
+      : feed.view === "week"
+        ? `${dateLabel(days[0], { day: "numeric", month: "short" })} – ${dateLabel(days[days.length - 1], { day: "numeric", month: "short" })}`
+        : dateLabel(feed.period_start, { weekday: "long", day: "numeric", month: "long" });
+  const today = new Date().toISOString().slice(0, 10);
+  const dayEvents = feed.view === "day" ? eventsOn(feed.period_start) : [];
+
+  return (
+    <div className={`board-slide board-calendar board-calendar-${feed.view} density-${density}`}>
+      <header className="board-calendar-head">
+        <span className="board-live"><CalendarDays size={16} /> {item.title}</span>
+        <h1>{periodLabel}</h1>
+      </header>
+      {feed.view === "day" && dayEvents.length === 1 ? (
+        // A single event has the whole screen: times, place and description in full.
+        <div className="board-calendar-single">
+          <strong>{rangeLabel(dayEvents[0])}</strong>
+          <h2>{dayEvents[0].title || t("board.noTitle")}</h2>
+          {dayEvents[0].location && (
+            <p className="board-calendar-where"><MapPin size={22} /> {dayEvents[0].location}</p>
+          )}
+          {dayEvents[0].description && <p className="board-calendar-description">{dayEvents[0].description}</p>}
+        </div>
+      ) : feed.view === "day" ? (
+        <div className="board-calendar-list">
+          {dayEvents.length === 0 && <p className="board-calendar-empty">{t("board.calendarEmpty")}</p>}
+          {dayEvents.map((event, index) => (
+            <div className="board-calendar-entry" key={`${event.uid}-${index}`}>
+              <strong>{rangeLabel(event)}</strong>
+              <div>
+                <span>{event.title || t("board.noTitle")}</span>
+                {event.location && <small>{event.location}</small>}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="board-calendar-grid">
+          {[0, 1, 2, 3, 4, 5, 6].map((weekday) => (
+            <span className="board-calendar-weekday" key={weekday}>{t(`day.short.${weekday}` as MessageKey)}</span>
+          ))}
+          {days.map((day) => {
+            const events = eventsOn(day);
+            const visible = events.slice(0, perDay);
+            const outside = day < feed.period_start || day >= feed.period_end;
+            return (
+              <div className={`board-calendar-day${outside ? " outside" : ""}${day === today ? " today" : ""}`} key={day}>
+                <span className="board-calendar-daynumber">{Number(day.slice(8, 10))}</span>
+                {visible.map((event, index) => (
+                  <span className="board-calendar-event" key={`${event.uid}-${index}`}>
+                    {/* The month view only has room for the start time and the title. */}
+                    <i>{feed.view === "week" && density === "roomy" ? rangeLabel(event) : timeLabel(event)}</i>{" "}
+                    {event.title || t("board.noTitle")}
+                    {feed.view === "week" && density !== "tight" && event.location && <em>{event.location}</em>}
+                  </span>
+                ))}
+                {events.length > visible.length && (
+                  <span className="board-calendar-more">{t("board.moreEvents", { count: events.length - visible.length })}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SlideContent({ item }: { item: PlaybackItem }) {
   const { t } = useI18n();
   if (item.kind === "ANNOUNCEMENT") {
@@ -324,6 +474,7 @@ function SlideContent({ item }: { item: PlaybackItem }) {
   if (item.kind === "DOCUMENT" || item.kind === "PPTX") return <PagedSlide item={item} />;
   if (item.kind === "EXCEL") return <SpreadsheetSlide item={item} />;
   if (item.kind === "EMERGENCY") return <EmergencySlide item={item} />;
+  if (item.kind === "CALENDAR") return <CalendarSlide item={item} />;
   return <PlaceholderSlide title={item.title} text={t("board.unsupported", { kind: item.kind })} onAir />;
 }
 

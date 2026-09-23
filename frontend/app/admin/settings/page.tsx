@@ -366,6 +366,16 @@ export default function SettingsPage() {
                 <h3><CalendarClock size={17} /> {t("settings.publications")}</h3>
                 {numberField("default_publication_days", "settings.defaultPublicationDays", 0, 3650)}
                 <p className="settings-help">{t("settings.defaultPublicationDaysHint")}</p>
+                <label className="settings-field">
+                  {t("settings.defaultCalendarUrl")}
+                  <input
+                    value={draft.default_calendar_ics_url}
+                    maxLength={1000}
+                    placeholder="https://.../calendar.ics"
+                    onChange={(event) => update("default_calendar_ics_url", event.target.value)}
+                  />
+                  <small>{t("settings.defaultCalendarUrlHint")}</small>
+                </label>
               </section>
               <section className="settings-card">
                 <h3><Monitor size={17} /> {t("settings.tvElements")}</h3>

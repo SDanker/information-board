@@ -10,7 +10,7 @@ from app.database import get_db
 from app.i18n import _
 from app.models import Content, ContentVersion, Playlist, PlaylistItem, Screen, User
 from app.realtime import publish_event
-from app.scheduling import is_item_scheduled_now, is_published_now
+from app.scheduling import is_item_scheduled_now, is_published_now, publication_status
 from app.schemas import (
     PlaylistCreate,
     PlaylistItemCreate,
@@ -144,7 +144,10 @@ def add_item(
     _editor: Annotated[User, Depends(require_editor)],
 ) -> PlaylistResponse:
     playlist = _load(db, playlist_id)
-    _active_content_or_404(db, payload.content_id)
+    content = _active_content_or_404(db, payload.content_id)
+    ended = publication_status(start_at=content.publish_start_at, end_at=content.publish_end_at, days=None) == "expired"
+    if content.is_archived or ended:
+        raise HTTPException(status_code=422, detail=_("Archived publications cannot be added to a playlist; restore it first"))
     data = payload.model_dump()
     if not data.get("order_index"):
         data["order_index"] = max((item.order_index for item in playlist.items), default=-1) + 1

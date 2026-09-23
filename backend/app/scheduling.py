@@ -97,7 +97,9 @@ def publication_status(
 
 
 def is_published_now(content: Content, at: datetime | None = None) -> bool:
-    """True when content may be shown: inside its publication period and on an allowed weekday."""
+    """True when content may be shown: not archived, inside its period and on an allowed weekday."""
+    if content.is_archived:
+        return False
     status = publication_status(start_at=content.publish_start_at, end_at=content.publish_end_at, days=content.publish_days, at=at)
     return status == "active"
 

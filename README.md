@@ -16,8 +16,14 @@ disk, NAS or S3-compatible cloud) and first administrator are all configurable.
   keeps playing the last known content if the connection drops.
 - **Content**: announcements, images, videos (transcoded with ffmpeg), documents, spreadsheets
   and presentations (converted with LibreOffice), with per-page or per-slide durations.
+- **Shared calendars**: paste the ICS address of an Outlook, Google or Nextcloud calendar and
+  show it as a month, week or day. The server reads and caches the feed, so the TVs need no
+  Internet access and the link is never exposed on screen.
 - **Publication periods**: every publication lasts 7 days by default (configurable); set its start
   and end date and time and the weekdays it appears when creating it, independently of playlists.
+  When the period ends it is archived: it leaves the playlists, moves to the **Archived** segment of
+  Content and of the download pages, where every archived publication can be downloaded (or all at
+  once as a zip), and it can be restored with a new period.
 - **Playlists and schedule**: ordering, per-item duration, validity by date, weekday and time.
 - **Featured events**: address geocoding, map, photos and videos, and a broadcast that takes over
   every screen instantly through WebSockets.

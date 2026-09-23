@@ -286,7 +286,9 @@ a { color: inherit; text-decoration: none; }
 .board-emergency { z-index: 1; width: min(94vw, 1500px); max-width: 1500px; height: 100%; display: flex; flex-direction: column; padding: 32px 40px; text-align: left; }
 .board-emergency-badge { color: #ff8a95; }
 .board-emergency h1 { margin: 18px 0 6px; font: 760 clamp(2.2rem, 4vw, 4rem)/1.05 var(--font-manrope), sans-serif; }
-.board-emergency-address { margin: 0 0 20px; color: #ffb3ba; font-size: clamp(1rem, 1.4vw, 1.3rem); font-weight: 700; }
+/* Two classes, so it wins over ".board-slide > p" (which centers slide paragraphs at 650px):
+   the address stays left-aligned under the title across the whole width. */
+.board-emergency > .board-emergency-address { max-width: none; margin: 0 0 20px; color: #ffb3ba; font-size: clamp(1rem, 1.4vw, 1.3rem); font-weight: 700; text-align: left; }
 /* minmax(0, ...) tracks instead of auto: with auto the row grows to each photo's natural
    height (the frame's 100% becomes circular) and the block resizes on every rotation.
    Fixed tracks keep the frame at the available space and the media fits inside it. */
@@ -466,3 +468,56 @@ a { color: inherit; text-decoration: none; }
   .login-language { top: 14px; right: 14px; }
   .settings-counts dl { grid-template-columns: 1fr; }
 }
+
+/* ---- Shared calendar (ICS) on the TV and in the content form ---- */
+.board-calendar { width: min(94vw, 1500px); max-width: 1500px; height: 100%; display: flex; flex-direction: column; gap: 14px; padding: 26px 34px; text-align: left; }
+.board-calendar-head { display: flex; flex-direction: column; gap: 4px; }
+.board-calendar-head h1 { margin: 0; font: 760 clamp(1.8rem, 3.2vw, 3rem)/1.05 var(--font-manrope), sans-serif; text-transform: capitalize; }
+/* The weekday row takes only the height of its text (auto); every day row shares the rest, so
+   a week view with a single row of days fills the screen instead of leaving a gap below. */
+.board-calendar-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto; grid-auto-rows: minmax(0, 1fr); gap: 4px 6px; }
+.board-calendar-weekday { color: #70b3ff; font-size: clamp(.6rem, .9vw, .8rem); font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.board-calendar-grid > .board-calendar-weekday { grid-row: 1; }
+.board-calendar-day { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 3px; padding: 6px 8px; background: rgba(9,22,40,.65); border: 1px solid rgba(105,173,255,.14); border-radius: 8px; }
+.board-calendar-day.outside { opacity: .38; }
+.board-calendar-day.today { background: rgba(37,99,235,.22); border-color: rgba(112,179,255,.5); }
+.board-calendar-daynumber { color: #d7e6fb; font-size: clamp(.75rem, 1.1vw, 1rem); font-weight: 750; }
+.board-calendar-event { overflow: hidden; color: #eaf2ff; font-size: clamp(.6rem, .85vw, .85rem); line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.board-calendar-event i { color: #70b3ff; font-style: normal; font-weight: 700; }
+.board-calendar-more { color: #9cb0c5; font-size: clamp(.55rem, .75vw, .72rem); }
+.board-calendar-week .board-calendar-event { white-space: normal; }
+.board-calendar-list { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+.board-calendar-entry { display: grid; grid-template-columns: minmax(90px, auto) 1fr; gap: 16px; align-items: baseline; padding: 12px 16px; background: rgba(9,22,40,.65); border-left: 3px solid var(--blue-600); border-radius: 8px; }
+.board-calendar-entry strong { color: #70b3ff; font-size: clamp(1rem, 1.6vw, 1.5rem); }
+.board-calendar-entry span { display: block; color: #eaf2ff; font-size: clamp(1rem, 1.5vw, 1.4rem); }
+.board-calendar-entry small { display: block; margin-top: 4px; color: #9cb0c5; font-size: clamp(.75rem, 1vw, .95rem); }
+.board-calendar-empty { color: #9cb0c5; font-size: clamp(1rem, 1.4vw, 1.3rem); }
+.calendar-test { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 6px 0 2px; }
+.calendar-test span { color: var(--slate-500); font-size: .74rem; }
+
+/* Calendar density: the month view only shows time and title, the week view adds the place
+   when there is room, and a day with a single event uses the whole screen. */
+.board-calendar-single { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 14px; }
+.board-calendar-single strong { color: #70b3ff; font-size: clamp(1.3rem, 2.8vw, 2.4rem); font-weight: 800; }
+.board-calendar-single h2 { margin: 0; font: 760 clamp(2rem, 4.4vw, 3.8rem)/1.05 var(--font-manrope), sans-serif; }
+.board-calendar-where { display: flex; align-items: center; gap: 10px; margin: 0; color: #d7e6fb; font-size: clamp(1rem, 1.7vw, 1.5rem); }
+.board-calendar-where svg { flex: 0 0 auto; color: #70b3ff; }
+.board-calendar-description { margin: 0; overflow: hidden; color: #9cb0c5; font-size: clamp(.9rem, 1.35vw, 1.25rem); line-height: 1.6; white-space: pre-line; }
+.board-calendar-event em { display: block; overflow: hidden; color: #9cb0c5; font-size: .85em; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.board-calendar-week.density-roomy .board-calendar-event { margin-bottom: 5px; font-size: clamp(.7rem, 1vw, .95rem); }
+.board-calendar-week.density-tight .board-calendar-event { font-size: clamp(.55rem, .75vw, .75rem); white-space: nowrap; }
+
+.form-toggle { grid-column: 1 / -1; margin-top: 18px; }
+.form-toggle label { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--slate-700); font-size: .84rem; font-weight: 700; }
+.form-toggle input { width: 18px; height: 18px; min-height: 0; margin: 0; flex: 0 0 auto; accent-color: var(--blue-600); }
+.form-toggle small { display: block; margin-top: 6px; color: var(--slate-500); font-size: .7rem; }
+
+/* Segments (Published / Archived): counts on the admin tabs, a hint under them, and the tabs of the download pages. */
+.tab-count { min-width: 20px; padding: 1px 7px; color: var(--slate-500); background: var(--slate-100); border-radius: 999px; font-size: .68rem; text-align: center; }
+.settings-tabs button.active .tab-count { color: var(--blue-600); background: white; }
+.segment-hint { margin: -4px 0 16px; color: var(--slate-500); font-size: .8rem; }
+.library-tabs { width: fit-content; max-width: 100%; display: flex; gap: 6px; margin: 0 auto 20px; padding: 5px; background: white; border: 1px solid var(--slate-200); border-radius: 12px; }
+.library-tabs button { padding: 9px 16px; color: var(--slate-500); background: transparent; border: 0; border-radius: 8px; font-size: .82rem; font-weight: 700; }
+.library-tabs button.active { color: var(--blue-600); background: var(--brand-soft); }
+.library-download-all { width: fit-content; margin: 0 auto 20px; text-decoration: none; }
+.library-card em { color: var(--slate-500); font-size: .68rem; font-style: normal; }

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Archive } from "lucide-react";
 
+import ArchivedLibrary from "@/components/ArchivedLibrary";
+import LibraryTabs, { LibraryTab } from "@/components/LibraryTabs";
 import PublicHeader from "@/components/PublicHeader";
 import { API_BASE, LibraryItem } from "@/lib/api";
 import { useBranding } from "@/lib/branding";
@@ -17,6 +19,7 @@ export default function LibraryPage() {
   const { branding } = useBranding();
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [state, setState] = useState<LoadState>("loading");
+  const [tab, setTab] = useState<LibraryTab>("current");
 
   useEffect(() => {
     let active = true;
@@ -51,22 +54,29 @@ export default function LibraryPage() {
         <h1>{t("library.title")}</h1>
         <p>{subtitle}</p>
       </div>
-      {state === "loading" && <p className="library-status">{t("common.loading")}</p>}
-      {state === "disabled" && <p className="library-status">{t("library.disabled")}</p>}
-      {state === "error" && <p className="library-status">{t("library.error")}</p>}
-      {state === "ready" && items.length === 0 && <p className="library-status">{t("library.empty")}</p>}
-      <div className="library-grid">
-        {items.map((item) => {
-          const Icon = KIND_ICONS[item.kind] ?? Archive;
-          return (
-            <Link key={item.id} href={`/share/${tokenFromShareUrl(item.share_url)}`} className="library-card">
-              {item.thumbnail_url ? <img className="library-thumb" src={item.thumbnail_url} alt={item.title} /> : <div className="library-icon"><Icon size={28} /></div>}
-              <strong>{item.title}</strong>
-              <span>{t(`kind.${item.kind}` as MessageKey)}</span>
-            </Link>
-          );
-        })}
-      </div>
+      <LibraryTabs value={tab} onChange={setTab} currentLabel="library.tab.available" />
+      {tab === "archived" ? (
+        <ArchivedLibrary />
+      ) : (
+        <>
+          {state === "loading" && <p className="library-status">{t("common.loading")}</p>}
+          {state === "disabled" && <p className="library-status">{t("library.disabled")}</p>}
+          {state === "error" && <p className="library-status">{t("library.error")}</p>}
+          {state === "ready" && items.length === 0 && <p className="library-status">{t("library.empty")}</p>}
+          <div className="library-grid">
+            {items.map((item) => {
+              const Icon = KIND_ICONS[item.kind] ?? Archive;
+              return (
+                <Link key={item.id} href={`/share/${tokenFromShareUrl(item.share_url)}`} className="library-card">
+                  {item.thumbnail_url ? <img className="library-thumb" src={item.thumbnail_url} alt={item.title} /> : <div className="library-icon"><Icon size={28} /></div>}
+                  <strong>{item.title}</strong>
+                  <span>{t(`kind.${item.kind}` as MessageKey)}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </>
+      )}
     </main>
   );
 }

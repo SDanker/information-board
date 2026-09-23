@@ -13,6 +13,7 @@ from pathlib import Path
 from redis import Redis
 from sqlalchemy import select
 
+from app.archiving import archive_expired
 from app.config import get_settings
 from app.content_paths import derived_prefix
 from app.database import SessionLocal
@@ -36,6 +37,7 @@ logger = logging.getLogger("worker")
 HEARTBEAT_KEY = "information-board:worker:heartbeat"
 IDLE_POLL_SECONDS = 3
 BUSY_POLL_SECONDS = 0.3
+SWEEP_INTERVAL_SECONDS = 60  # how often finished publications are archived
 
 
 def _log(message: str, **fields) -> None:
@@ -158,11 +160,24 @@ def _finalize_failure(db, job: ProcessingJob, version: ContentVersion, message: 
     publish_event({"target": "admin", "type": "content_changed"})
 
 
+def archive_finished_publications() -> None:
+    """Archive the publications whose period ended; an error here never stops the worker loop."""
+    try:
+        with SessionLocal() as db:
+            archive_expired(db)
+    except Exception:
+        logger.exception("Could not archive the finished publications")
+
+
 def run() -> None:
     redis = Redis.from_url(get_settings().redis_url)
     _log("worker_started")
+    last_sweep = 0.0
     while True:
         redis.set(HEARTBEAT_KEY, str(time.time()), ex=30)
+        if time.monotonic() - last_sweep >= SWEEP_INTERVAL_SECONDS:
+            last_sweep = time.monotonic()
+            archive_finished_publications()
         try:
             processed = process_one_job()
         except Exception:

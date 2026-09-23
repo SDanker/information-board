@@ -36,6 +36,8 @@ export type Branding = {
   login_message: string;
   board_footer_text: string;
   public_library_enabled: boolean;
+  /** Pre-filled when creating a Calendar publication. */
+  default_calendar_ics_url: string;
   display: DisplaySettings;
   logo_url: string | null;
 };

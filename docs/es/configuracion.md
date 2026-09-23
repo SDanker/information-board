@@ -46,16 +46,46 @@ idiomas; deja el campo vacío para usar el nombre por defecto traducido.
 | Segundos mínimos por página o diapositiva | 4 | Los documentos y presentaciones de varias páginas siguen en pantalla hasta mostrar todas. Cada página puede tener su propia duración. |
 | Segundos por foto o mapa de acto destacado | 7 | Los videos de los actos destacados siempre se reproducen completos. |
 | Filas por página en planillas | 14 | Las tablas grandes se dividen en varias páginas. |
+| Dirección por defecto del calendario (ICS) | vacío | Se rellena al crear una publicación de tipo Calendario, para que cada instalación use su propio calendario. Valor inicial: `DEFAULT_CALENDAR_ICS_URL`. |
 | Duración por defecto de una publicación (días) | 7 | Las publicaciones nuevas comienzan al crearlas y terminan después de esta cantidad de días. 0 = sin término. Valor inicial: `DEFAULT_PUBLICATION_DAYS`. |
 | Mostrar el reloj / reloj de 24 horas | sí / sí | |
 | Mostrar el mapa en actos destacados | sí | |
 | Texto del pie en la TV | vacío | Reemplaza la ruta de la pantalla abajo a la izquierda. |
 | Código QR: mostrar, posición, mensaje | sí, abajo a la derecha | El QR abre `/catalog/<slug>` con todos los elementos de la playlist de la pantalla. |
 
+### Calendarios compartidos
+
+Una publicación de tipo **Calendario** muestra en las pantallas un calendario compartido, por
+mes, semana o día:
+
+1. Publica el calendario en tu proveedor y copia la dirección que termina en `.ics`:
+   - **Outlook / Microsoft 365**: Calendario → Configuración → Calendarios compartidos →
+     Publicar un calendario. Elige "Puede ver todos los detalles" para mostrar los títulos de
+     los eventos y copia el enlace **ICS** (el enlace HTML es la página web de Outlook y la
+     cartelera no puede dibujarlo).
+   - **Google Calendar**: Configuración → el calendario → "Dirección secreta en formato iCal".
+   - **Nextcloud**: Calendario → Compartir → publicar, y luego el enlace de suscripción (ICS).
+2. En **Publicaciones → Nueva publicación → Calendario**, pega la dirección, elige la vista y
+   usa **Probar enlace** para confirmar que se puede leer. Para tenerla siempre lista,
+   guárdala en `DEFAULT_CALENDAR_ICS_URL` o en **Configuración → Pantallas y TV → Publicaciones**.
+3. Agrega la publicación a una playlist, como cualquier otra.
+
+Un calendario nunca muestra el código QR de la pantalla y no aparece en el catálogo ni en la
+biblioteca pública: se lee en vivo desde su origen, así que no hay nada que descargar y el código
+sólo taparía parte de la grilla. Cualquier otra publicación puede ocultar el código por su cuenta
+con **Mostrar el código QR mientras se ve esta publicación** en su formulario.
+
+El servidor descarga el calendario, expande los eventos que se repiten y convierte cada hora a
+la zona horaria de la instalación, así que las TV no necesitan internet y la dirección nunca
+aparece en pantalla. El resultado se guarda en caché por 10 minutos, y se conserva hasta una
+semana: si el proveedor no responde, las pantallas siguen mostrando los últimos eventos
+conocidos. Cualquiera con el enlace ICS puede ver el calendario, así que trátalo como una
+contraseña y usa **Probar enlace** en vez de abrirlo en público.
+
 ### Período de publicación
 
-Cada publicación, excepto los actos destacados (que se transmiten y detienen a mano), tiene un
-período que se define al crearla y se puede cambiar después con **Editar**:
+Cada publicación, incluidos los actos destacados, tiene un período que se define al crearla y se
+puede cambiar después con **Editar**:
 
 - **Inicio / Término**: fecha y hora en la zona horaria de la instalación. Inicio vacío = de
   inmediato; término vacío = sin fecha de término. Las publicaciones nuevas vienen con
@@ -66,8 +96,30 @@ período que se define al crearla y se puede cambiar después con **Editar**:
 Fuera de su período la publicación no se muestra en ninguna pantalla, esté en las playlists que
 esté, y desaparece de los catálogos de pantalla, la biblioteca pública y los enlaces compartidos.
 Los elementos de una playlist pueden sumar sus propias fechas, días y horas. **Programación**
-lista todas las publicaciones con su período y estado (publicada, programada, hoy no, vencida).
-Las publicaciones creadas antes de esta opción no tienen límites.
+lista todas las publicaciones con su período y estado (publicada, programada, hoy no). Las
+publicaciones creadas antes de esta opción no tienen límites, así que nada de lo que ya estaba en
+pantalla desaparece.
+
+Un acto destacado que se está transmitiendo permanece en todas las pantallas hasta que detengas la
+transmisión, sin importar su período.
+
+### Publicaciones archivadas
+
+Cuando una publicación llega a su fecha y hora de término se **archiva** en menos de un minuto:
+
+- Sale de todas las playlists y deja de aparecer en las pantallas y en los catálogos de pantalla.
+- Pasa al segmento **Archivadas** de **Publicaciones**, con un contador en la pestaña.
+- Aparece en el segmento **Archivadas** de las páginas de descarga (`/library` y la página que abre
+  el QR de una pantalla). Cada elemento se puede seguir descargando, y **Descargar todo (.zip)**
+  reúne todas las publicaciones archivadas, una carpeta por cada una. Sólo se listan las que son
+  *públicas en la red local*, y el segmento sigue el interruptor de la biblioteca pública.
+- Los enlaces y códigos QR que ya existían siguen entregando el archivo.
+
+**Restaurar** (en el segmento Archivadas) la publica de nuevo desde ahora con el período por
+defecto, conservando los días de la semana que tenía. Restaurar no la devuelve a las playlists,
+porque al archivarla se sacó de ellas: agrégala otra vez desde **Playlists** y ajusta el período con
+**Editar**. Archivar a mano desde la API (`is_archived`) funciona igual. Los calendarios también se
+archivan, pero no tienen nada que descargar.
 
 ### Selector de idioma
 

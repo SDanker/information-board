@@ -1,4 +1,6 @@
 import io
+from collections.abc import Iterator
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 import uuid
@@ -17,7 +19,7 @@ from app.file_responses import storage_file_response
 from app.i18n import _
 from app.models import Content, ContentVersion, ShareToken, User, utc_now
 from app.network import public_base_url
-from app.scheduling import is_published_now
+from app.scheduling import is_published_now, publication_status
 from app.schemas import LibraryItem, PublicShareDetail, ShareDownloadItem, ShareInfo
 from app.security import require_editor
 from app.sharing_service import get_or_create_token, qr_url_for, share_url_for, thumbnail_url_for
@@ -92,10 +94,11 @@ def _resolve_valid_token(db: Session, token_value: str) -> ShareToken:
     if token is None or (token.expires_at and token.expires_at < utc_now()):
         raise not_found
     content = token.content
-    if content is None or content.deleted_at is not None or content.is_archived or content.library_visibility == "PRIVATE":
+    if content is None or content.deleted_at is not None or content.library_visibility == "PRIVATE":
         raise not_found
-    # Links follow the publication period: before it starts or after it ends they do not open.
-    if not is_published_now(content):
+    # A link opens once the publication has started and keeps working after it ends: archived
+    # publications stay downloadable from the library, so older links and QR codes still deliver the file.
+    if publication_status(start_at=content.publish_start_at, end_at=content.publish_end_at, days=content.publish_days) == "scheduled":
         raise not_found
     return token
 
@@ -207,6 +210,8 @@ def public_library(request: Request, db: Annotated[Session, Depends(get_db)]) ->
     contents = db.scalars(
         select(Content)
         .where(Content.library_visibility == "LOCAL_PUBLIC", Content.deleted_at.is_(None), Content.is_archived.is_(False))
+        # Calendars are read live from their source, so they have nothing to download.
+        .where(Content.kind != "CALENDAR")
         .where(Content.published_version_id.is_not(None))
         .options(selectinload(Content.published_version).selectinload(ContentVersion.assets))
         .order_by(Content.updated_at.desc())
@@ -227,3 +232,133 @@ def public_library(request: Request, db: Annotated[Session, Depends(get_db)]) ->
             )
         )
     return items
+
+
+def _require_public_library(db: Session) -> None:
+    if not load_branding(db).public_library_enabled:
+        raise HTTPException(status_code=404, detail=_("The public library is disabled"))
+
+
+def _archived_contents(db: Session) -> list[Content]:
+    """Archived and expired publications that are public on the local network, most recent first.
+
+    Expired ones are included even before the worker archives them, so the list never lags.
+    Calendars are left out: they are read live from their source and have nothing to download.
+    """
+    contents = db.scalars(
+        select(Content)
+        .where(Content.library_visibility == "LOCAL_PUBLIC", Content.deleted_at.is_(None), Content.kind != "CALENDAR")
+        .where(Content.published_version_id.is_not(None))
+        .options(selectinload(Content.published_version).selectinload(ContentVersion.assets))
+    ).all()
+    finished = [
+        content
+        for content in contents
+        if content.is_archived
+        or publication_status(start_at=content.publish_start_at, end_at=content.publish_end_at, days=None) == "expired"
+    ]
+    return sorted(finished, key=lambda content: content.publish_end_at or datetime.min, reverse=True)
+
+
+@router.get("/public/library/archived", response_model=list[LibraryItem])
+def public_library_archived(request: Request, db: Annotated[Session, Depends(get_db)]) -> list[LibraryItem]:
+    """The "Archived" segment of the download pages: publications whose period has ended."""
+    _require_public_library(db)
+    base = public_base_url(request)
+    items: list[LibraryItem] = []
+    for content in _archived_contents(db):
+        token = get_or_create_token(db, content)
+        items.append(
+            LibraryItem(
+                id=content.id,
+                kind=content.kind,
+                title=content.title,
+                thumbnail_url=thumbnail_url_for(content.published_version),
+                share_url=f"{base}/share/{token.token}",
+                period_end=content.publish_end_at,
+            )
+        )
+    return items
+
+
+def _content_files(content: Content) -> list[tuple[str, str]]:
+    """Files worth downloading from a publication, as (archive name, storage path)."""
+    version = content.published_version
+    if version is None:
+        return []
+    if content.kind == "EMERGENCY":
+        photos = sorted((a for a in version.assets if a.kind == "PHOTO"), key=lambda a: (a.page_number or 0))
+        files = [(f"photo-{number}{Path(photo.storage_path).suffix}", photo.storage_path) for number, photo in enumerate(photos, start=1)]
+        video = next((a for a in version.assets if a.kind == "VIDEO"), None)
+        if video is not None:
+            files.append((f"video{Path(video.storage_path).suffix}", video.storage_path))
+        return files
+    source = next((a for a in version.assets if a.kind == "SOURCE"), None)
+    if source is not None and get_storage().exists(source.storage_path):
+        return [(safe_filename(content.title) + Path(source.storage_path).suffix, source.storage_path)]
+    pages = sorted((a for a in version.assets if a.kind == "PAGE"), key=lambda a: (a.page_number or 0))
+    return [(f"page-{page.page_number or 0}.webp", page.storage_path) for page in pages]
+
+
+class _ZipSink(io.RawIOBase):
+    """Write-only, non-seekable target for zipfile: collects what was written so it can be sent at once."""
+
+    def __init__(self) -> None:
+        self._chunks: list[bytes] = []
+        self._position = 0
+
+    def writable(self) -> bool:
+        return True
+
+    def write(self, data) -> int:
+        self._chunks.append(bytes(data))
+        self._position += len(data)
+        return len(data)
+
+    def tell(self) -> int:
+        return self._position
+
+    def drain(self) -> bytes:
+        chunks, self._chunks = self._chunks, []
+        return b"".join(chunks)
+
+
+def _stream_zip(entries: list[tuple[str, str]]) -> Iterator[bytes]:
+    """Zip the files while they are sent, so a large archive never sits in memory (one chunk at a time)."""
+    storage = get_storage()
+    sink = _ZipSink()
+    with zipfile.ZipFile(sink, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as archive:
+        for archive_name, storage_path in entries:
+            if not storage.exists(storage_path):
+                continue
+            with archive.open(archive_name, "w", force_zip64=True) as target:
+                for chunk in storage.iter_range(storage_path, 0, storage.size(storage_path) - 1):
+                    target.write(chunk)
+                    data = sink.drain()
+                    if data:
+                        yield data
+            data = sink.drain()
+            if data:
+                yield data
+    tail = sink.drain()  # the central directory, written when the archive closes
+    if tail:
+        yield tail
+
+
+@router.get("/public/library/archived/download")
+def public_library_archived_download(db: Annotated[Session, Depends(get_db)]) -> StreamingResponse:
+    """Every archived publication in one zip, each in its own folder."""
+    _require_public_library(db)
+    entries: list[tuple[str, str]] = []
+    folders: set[str] = set()
+    for content in _archived_contents(db):
+        folder = safe_filename(content.title)
+        if folder in folders:
+            folder = f"{folder}-{str(content.id)[:8]}"
+        folders.add(folder)
+        entries += [(f"{folder}/{name}", path) for name, path in _content_files(content)]
+    if not entries:
+        raise HTTPException(status_code=404, detail=_("Nothing to download yet"))
+    return StreamingResponse(
+        _stream_zip(entries), media_type="application/zip", headers={"Content-Disposition": content_disposition("archived-publications.zip")}
+    )

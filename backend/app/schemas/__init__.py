@@ -10,6 +10,7 @@ from .auth_screens import (
 from .branding_schemas import BrandingResponse, BrandingSettings, DisplaySettings
 from .content_schemas import (
     AnnouncementPayload,
+    CalendarPayload,
     AssetResponse,
     AssetUpdate,
     ContentCreate,
@@ -29,7 +30,7 @@ from .playlist_schemas import (
     PlaylistUpdate,
 )
 from .sharing_schemas import LibraryItem, PublicShareDetail, ScreenLibraryResponse, ShareDownloadItem, ShareInfo
-from .emergency_schemas import ActiveEmergencyResponse, EmergencyCreate, EmergencyLocationUpdate, EmergencySection
+from .emergency_schemas import ActiveEmergencyResponse, EmergencyCreate, EmergencyLocationUpdate, EmergencySection, EmergencyUpdate
 from .user_schemas import PasswordChange, UserCreate, UserResponse, UserUpdate
 
 __all__ = [
@@ -44,6 +45,7 @@ __all__ = [
     "BrandingResponse",
     "DisplaySettings",
     "AnnouncementPayload",
+    "CalendarPayload",
     "AssetResponse",
     "AssetUpdate",
     "ContentVersionResponse",
@@ -67,6 +69,7 @@ __all__ = [
     "EmergencyCreate",
     "EmergencySection",
     "EmergencyLocationUpdate",
+    "EmergencyUpdate",
     "ActiveEmergencyResponse",
     "UserCreate",
     "UserUpdate",

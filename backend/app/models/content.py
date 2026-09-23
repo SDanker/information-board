@@ -10,7 +10,7 @@ from .screens_users import utc_now
 # A single content model covers announcements, images, video, documents, spreadsheets,
 # presentations and emergencies: `kind` tells them apart and `payload` holds the
 # type-specific data.
-CONTENT_KINDS = ("ANNOUNCEMENT", "IMAGE", "VIDEO", "DOCUMENT", "EXCEL", "PPTX", "EMERGENCY")
+CONTENT_KINDS = ("ANNOUNCEMENT", "IMAGE", "VIDEO", "DOCUMENT", "EXCEL", "PPTX", "EMERGENCY", "CALENDAR")
 VERSION_STATUSES = ("PENDING", "PROCESSING", "READY", "FAILED")
 LIBRARY_VISIBILITIES = ("LOCAL_PUBLIC", "QR_ONLY", "PRIVATE")
 

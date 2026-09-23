@@ -5,6 +5,7 @@ import { Check, Clock3, GripVertical, ListPlus, PlaySquare, Plus, RefreshCw, Set
 
 import AdminShell from "@/components/AdminShell";
 import { apiFetch, Content, Playlist, PlaylistItem } from "@/lib/api";
+import { isArchivedContent } from "@/lib/publication";
 import { useAuthReady } from "@/lib/auth";
 import { useDisplaySettings } from "@/lib/branding";
 import { MessageKey, useI18n } from "@/lib/i18n";
@@ -180,7 +181,7 @@ export default function PlaylistsPage() {
                   }}
                 >
                   <option value="" disabled>{t("playlists.addContent")}</option>
-                  {contents.map((content) => (
+                  {contents.filter((content) => !isArchivedContent(content)).map((content) => (
                     <option key={content.id} value={content.id}>{content.title}</option>
                   ))}
                 </select>

@@ -18,7 +18,35 @@ export type Screen = {
   status: "ONLINE" | "OFFLINE";
 };
 
-export type ContentKind = "ANNOUNCEMENT" | "IMAGE" | "VIDEO" | "DOCUMENT" | "EXCEL" | "PPTX" | "EMERGENCY";
+export type ContentKind = "ANNOUNCEMENT" | "IMAGE" | "VIDEO" | "DOCUMENT" | "EXCEL" | "PPTX" | "EMERGENCY" | "CALENDAR";
+
+export type CalendarView = "month" | "week" | "day";
+
+/** Stored configuration of a CALENDAR publication. */
+export type CalendarConfig = { ics_url: string; view: CalendarView };
+
+export type CalendarEvent = {
+  uid: string;
+  title: string;
+  location: string;
+  description: string;
+  /** Local wall time "YYYY-MM-DDTHH:MM", or "YYYY-MM-DD" when it lasts all day. */
+  start: string;
+  end: string;
+  all_day: boolean;
+};
+
+/** Answer of /public/calendar/{id}: the period to draw and the events inside it. */
+export type CalendarFeed = {
+  view: CalendarView;
+  timezone: string;
+  period_start: string;
+  period_end: string;
+  range_start: string;
+  range_end: string;
+  updated_at: string;
+  events: CalendarEvent[];
+};
 
 export type Asset = {
   id: string;
@@ -96,6 +124,8 @@ export type LibraryItem = {
   title: string;
   thumbnail_url: string | null;
   share_url: string;
+  /** When the period ended (local wall time); set on archived publications. */
+  period_end?: string | null;
 };
 
 export type ShareInfo = {

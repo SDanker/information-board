@@ -16,8 +16,10 @@ from app.geocoding import geocode_address
 from app.i18n import _
 from app.models import ACTIVE_EMERGENCY_KEY, Asset, Content, ContentVersion, ProcessingJob, SystemSetting, User, utc_now
 from app.processing import optimize_image
+from app.publication import PUBLICATION_FIELDS, initial_publication
 from app.realtime import publish_event
-from app.schemas import ContentResponse, ContentVersionResponse, EmergencyCreate, EmergencyLocationUpdate
+from app.schemas import ContentResponse, ContentVersionResponse, EmergencyCreate, EmergencyLocationUpdate, EmergencyUpdate
+from app.schemas.content_schemas import check_publication_window
 from app.security import require_editor, require_operator
 from app.storage import get_storage
 from app.uploads import UPLOAD_RULES, max_size_bytes
@@ -64,7 +66,13 @@ def create_emergency(
     else:
         provider = "manual"
 
-    content = Content(kind="EMERGENCY", title=payload.title, library_visibility="LOCAL_PUBLIC", created_by=user.id)
+    content = Content(
+        kind="EMERGENCY",
+        title=payload.title,
+        library_visibility="LOCAL_PUBLIC",
+        created_by=user.id,
+        **initial_publication(db, payload.model_dump(include=PUBLICATION_FIELDS, exclude_unset=True)),
+    )
     db.add(content)
     db.flush()
     version = ContentVersion(
@@ -87,6 +95,54 @@ def create_emergency(
     db.commit()
     db.refresh(content)
     record_audit(db, user, "create", "emergency", str(content.id), {"title": content.title, "address": payload.address})
+    publish_event({"target": "admin", "type": "content_changed"})
+    return _response(_load(db, content.id))
+
+
+@router.patch("/emergencies/{content_id}", response_model=ContentResponse)
+def update_emergency(
+    content_id: uuid.UUID,
+    payload: EmergencyUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_editor)],
+) -> ContentResponse:
+    """Edit the title and texts of a featured event; photos, video and broadcast state are kept.
+
+    A changed address is geocoded again. When the new address cannot be located the previous
+    coordinates are removed, so screens never show a map of the old place; they can then be set
+    by hand through the location endpoint.
+    """
+    content = _load(db, content_id)
+    version = _published_version_or_404(content)
+    if payload.title is not None:
+        content.title = payload.title
+    for field, value in payload.model_dump(include=PUBLICATION_FIELDS, exclude_unset=True).items():
+        setattr(content, field, value)
+    try:
+        # Checked on the merged values, because a PATCH may change only one side of the period.
+        check_publication_window(content.publish_start_at, content.publish_end_at)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    previous = version.payload or {}
+    updated = dict(previous)
+    if payload.description is not None:
+        updated["description"] = payload.description
+    if payload.sections is not None:
+        updated["sections"] = [section.model_dump() for section in payload.sections]
+    if payload.address is not None:
+        updated["address"] = payload.address
+        if payload.address.strip() != (previous.get("address") or "").strip():
+            result = geocode_address(payload.address) if payload.address.strip() else None
+            updated["latitude"] = result.latitude if result else None
+            updated["longitude"] = result.longitude if result else None
+            updated["geocode_provider"] = result.provider if result else None
+    # A new dict (not an in-place change) so SQLAlchemy detects the JSON update.
+    version.payload = updated
+    db.commit()
+    record_audit(db, user, "update", "emergency", str(content.id), {"title": content.title})
+    publish_event({"target": "all_screens", "type": "content_updated", "content_id": str(content.id)})
     publish_event({"target": "admin", "type": "content_changed"})
     return _response(_load(db, content.id))
 

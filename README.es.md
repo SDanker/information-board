@@ -16,8 +16,14 @@ páginas, almacenamiento (disco local, NAS o nube compatible con S3) y el primer
   para modo kiosco, sigue mostrando el último contenido conocido si se corta la conexión.
 - **Contenido**: anuncios, imágenes, videos (convertidos con ffmpeg), documentos, planillas y
   presentaciones (convertidos con LibreOffice), con duración por página o diapositiva.
+- **Calendarios compartidos**: pega la dirección ICS de un calendario de Outlook, Google o
+  Nextcloud y muéstralo por mes, semana o día. El servidor lee el calendario y lo guarda en
+  caché, así las TV no necesitan internet y el enlace nunca aparece en pantalla.
 - **Períodos de publicación**: cada publicación dura 7 días por defecto (configurable); al crearla se
   define fecha y hora de inicio y término y los días de la semana en que aparece, sin importar las playlists.
+  Al terminar el período se archiva: sale de las playlists y pasa al segmento **Archivadas** de
+  Publicaciones y de las páginas de descarga, donde cada publicación archivada se puede descargar (o todas
+  juntas en un zip), y se puede restaurar con un período nuevo.
 - **Playlists y programación**: orden, duración por elemento, vigencia por fecha, día y hora.
 - **Actos destacados**: geocodificación de direcciones, mapa, fotos y videos, y una transmisión que
   toma todas las pantallas al instante mediante WebSockets.

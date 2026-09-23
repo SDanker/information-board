@@ -122,15 +122,16 @@ def test_only_content_inside_its_period_reaches_screens_catalogs_and_links(clien
     tomorrow = (local_wall_time().weekday() + 1) % 7
     ids = {
         "Active": _announcement(client, auth_headers, title="Active").json()["id"],
-        "Expired": _announcement(
-            client, auth_headers, title="Expired", publish_start_at=_from_now(timedelta(days=-3)), publish_end_at=_from_now(timedelta(days=-1))
-        ).json()["id"],
+        "Expired": _announcement(client, auth_headers, title="Expired").json()["id"],
         "Upcoming": _announcement(client, auth_headers, title="Upcoming", publish_start_at=_from_now(timedelta(days=1))).json()["id"],
         "Off day": _announcement(client, auth_headers, title="Off day", publish_days=[tomorrow]).json()["id"],
     }
     playlist = client.post("/api/v1/playlists", headers=auth_headers, json={"name": "Periods"}).json()
     for content_id in ids.values():
         client.post(f"/api/v1/playlists/{playlist['id']}/items", headers=auth_headers, json={"content_id": content_id})
+    # It ends after having been in the playlist: a finished publication cannot be added to one.
+    ended = {"publish_start_at": _from_now(timedelta(days=-3)), "publish_end_at": _from_now(timedelta(days=-1))}
+    assert client.patch(f"/api/v1/content/{ids['Expired']}", headers=auth_headers, json=ended).status_code == 200
     screen = next(s for s in client.get("/api/v1/screens", headers=auth_headers).json() if s["slug"] == "principal")
     client.patch(f"/api/v1/screens/{screen['id']}", headers=auth_headers, json={"playlist_id": playlist["id"]})
 
@@ -147,8 +148,11 @@ def test_only_content_inside_its_period_reaches_screens_catalogs_and_links(clien
     assert {item["title"] for item in catalog["items"]} == {"Active"}
     assert {item["title"] for item in client.get("/api/v1/public/library").json()} == {"Active"}
 
+    # Links keep working after the period ends (archived publications stay downloadable) but not before it starts.
     expired_share = client.get(f"/api/v1/content/{ids['Expired']}/share", headers=auth_headers).json()
-    assert client.get(f"/api/v1/public/share/{expired_share['token']}").status_code == 404
+    assert client.get(f"/api/v1/public/share/{expired_share['token']}").status_code == 200
+    upcoming_share = client.get(f"/api/v1/content/{ids['Upcoming']}/share", headers=auth_headers).json()
+    assert client.get(f"/api/v1/public/share/{upcoming_share['token']}").status_code == 404
     active_share = client.get(f"/api/v1/content/{ids['Active']}/share", headers=auth_headers).json()
     assert client.get(f"/api/v1/public/share/{active_share['token']}").status_code == 200
 
@@ -183,8 +187,25 @@ def test_uploads_accept_a_period(client, auth_headers):
     assert upload(publish_days="1,9").status_code == 422
 
 
-def test_emergencies_have_no_period_by_default(client, auth_headers):
+def test_featured_events_get_the_default_period_and_can_change_it(client, auth_headers):
     body = client.post("/api/v1/emergencies", headers=auth_headers, json={"title": "Drill"}).json()
-    assert body["publish_start_at"] is None
-    assert body["publish_end_at"] is None
+    start = datetime.fromisoformat(body["publish_start_at"])
+    assert datetime.fromisoformat(body["publish_end_at"]) - start == timedelta(days=7)
     assert body["publication_status"] == "active"
+
+    custom = client.post(
+        "/api/v1/emergencies",
+        headers=auth_headers,
+        json={"title": "Custom", "publish_start_at": "2030-02-01T09:00", "publish_end_at": None, "publish_days": [5, 6]},
+    ).json()
+    assert custom["publish_start_at"] == "2030-02-01T09:00:00"
+    assert custom["publish_end_at"] is None
+    assert custom["publish_days"] == [5, 6]
+
+    edited = client.patch(
+        f"/api/v1/emergencies/{body['id']}", headers=auth_headers, json={"publish_end_at": "2031-01-01T00:00", "publish_days": [0]}
+    ).json()
+    assert edited["publish_end_at"] == "2031-01-01T00:00:00"
+    assert edited["publish_days"] == [0]
+    invalid = client.patch(f"/api/v1/emergencies/{body['id']}", headers=auth_headers, json={"publish_end_at": "2000-01-01T00:00"})
+    assert invalid.status_code == 422

@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.calendar_feed import normalize_feed_url
 from app.i18n import _
 
 # Navigation pages whose visible name can be customized.
@@ -48,6 +49,8 @@ class BrandingSettings(BaseModel):
     login_message: str = Field(default="", max_length=300)
     board_footer_text: str = Field(default="", max_length=120)
     public_library_enabled: bool = True
+    # Suggested calendar for new Calendar publications; empty = type it every time.
+    default_calendar_ics_url: str = Field(default="", max_length=1000)
     display: DisplaySettings = Field(default_factory=DisplaySettings)
 
     @field_validator("app_name")
@@ -69,6 +72,12 @@ class BrandingSettings(BaseModel):
         if not _HEX_COLOR.fullmatch(value):
             raise ValueError(_("Enter a color in #RRGGBB format"))
         return value.lower()
+
+    @field_validator("default_calendar_ics_url")
+    @classmethod
+    def valid_calendar_url(cls, value: str) -> str:
+        value = value.strip()
+        return normalize_feed_url(value) if value else ""
 
     @field_validator("timezone")
     @classmethod

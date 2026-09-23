@@ -8,6 +8,13 @@ import type { MessageKey, useI18n } from "./i18n";
  */
 
 export const DEFAULT_PUBLICATION_DAYS = 7;
+
+/** Archived by hand or by the worker, or already past its end (the worker archives those within a minute).
+ * A featured event on the air stays where it is until its broadcast is stopped. */
+export function isArchivedContent(item: Pick<Content, "id" | "is_archived" | "publication_status">, liveEventId?: string | null): boolean {
+  if (item.is_archived) return true;
+  return item.publication_status === "expired" && item.id !== liveEventId;
+}
 export const PUBLICATION_PRESETS = [1, 7, 14, 30];
 export const WEEK_DAYS = [0, 1, 2, 3, 4, 5, 6];
 

@@ -1,8 +1,10 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.calendar_feed import normalize_feed_url
 from app.i18n import _
 from app.models import CONTENT_KINDS, LIBRARY_VISIBILITIES
 from app.scheduling import local_wall_time, publication_status
@@ -48,6 +50,18 @@ class AnnouncementPayload(BaseModel):
     body: str = Field(min_length=1, max_length=4000)
     background: str = Field(default="brand", max_length=40)
     accent: str | None = Field(default=None, max_length=40)
+
+
+class CalendarPayload(BaseModel):
+    """Shared calendar (ICS) that the screens draw as a month, week or day view."""
+
+    ics_url: str = Field(min_length=8, max_length=1000)
+    view: Literal["month", "week", "day"] = "month"
+
+    @field_validator("ics_url")
+    @classmethod
+    def valid_url(cls, value: str) -> str:
+        return normalize_feed_url(value)
 
 
 def _check_visibility(value: str | None) -> str | None:
@@ -104,6 +118,7 @@ class ContentCreate(PublicationWindow):
     library_visibility: str = Field(default="LOCAL_PUBLIC")
     qr_overlay: dict | None = None
     announcement: AnnouncementPayload | None = None
+    calendar: CalendarPayload | None = None
 
     @field_validator("kind")
     @classmethod

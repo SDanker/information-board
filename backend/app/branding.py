@@ -39,6 +39,7 @@ def default_branding() -> BrandingSettings:
         "default_language": settings.default_language,
         "date_locale": settings.resolved_date_locale,
         "timezone": settings.timezone,
+        "default_calendar_ics_url": settings.default_calendar_ics_url,
     }
     valid: dict[str, object] = {}
     for key, value in candidates.items():

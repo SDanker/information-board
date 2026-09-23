@@ -229,6 +229,9 @@ def _resolve_qr_overlay(screen: Screen, content: Content, display: DisplaySettin
     """
     if not display.show_qr or content.library_visibility == "PRIVATE":
         return None
+    # A calendar has nothing to download, so the code would only cover the grid.
+    if content.kind == "CALENDAR":
+        return None
     screen_config = screen.qr_config or {}
     content_config = content.qr_overlay or {}
     if screen_config.get("visible") is False or content_config.get("visible") is False:
@@ -274,6 +277,9 @@ def public_screen_library(slug: str, request: Request, db: Annotated[Session, De
         if content is None or content.id in seen or content.deleted_at is not None or content.is_archived:
             continue
         if content.library_visibility == "PRIVATE" or content.published_version is None or not is_published_now(content):
+            continue
+        # Calendars are read live from their source: there is no file to offer here.
+        if content.kind == "CALENDAR":
             continue
         seen.add(content.id)
         token = get_or_create_token(db, content)

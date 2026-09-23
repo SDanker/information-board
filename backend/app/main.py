@@ -11,7 +11,20 @@ from app.logging_config import configure_logging
 from app.network import configured_base_url
 from app.network_restriction import NetworkRestrictionMiddleware
 from app.realtime import manager as realtime_manager
-from app.routers import auth, branding, content, emergencies, health, operation, playlists, realtime, screens, sharing, users
+from app.routers import (
+    auth,
+    branding,
+    calendars,
+    content,
+    emergencies,
+    health,
+    operation,
+    playlists,
+    realtime,
+    screens,
+    sharing,
+    users,
+)
 
 
 @asynccontextmanager
@@ -57,6 +70,7 @@ app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(branding.router, prefix="/api/v1")
 app.include_router(screens.router, prefix="/api/v1")
 app.include_router(content.router, prefix="/api/v1")
+app.include_router(calendars.router, prefix="/api/v1")
 app.include_router(playlists.router, prefix="/api/v1")
 app.include_router(sharing.router, prefix="/api/v1")
 app.include_router(emergencies.router, prefix="/api/v1")
